@@ -250,3 +250,17 @@ def test_uk_alias_normalised():
 def test_export_port_not_taken_as_destination():
     e = normalise(RawEnquiry(direction="export", origin_country="GB", destination_port_name="Felixstowe"))
     assert e.destination_country is None and e.direction is Direction.EXPORT
+
+
+@pytest.mark.parametrize("ctype", ["container", "FCL", "full container", "box"])
+def test_container_without_size_asks_instead_of_rejecting(ctype):
+    e = normalise(RawEnquiry(containers=[{"container_type": ctype, "quantity": 1}]))
+    assert e.service is Service.FCL and e.containers == []
+    assert not e.special_requirements
+    assert any("size not stated" in n for n in e.extraction_notes)
+
+
+@pytest.mark.parametrize("ctype", ["reefer", "flat rack", "45HC", "40 open top"])
+def test_special_containers_still_flagged(ctype):
+    e = normalise(RawEnquiry(containers=[{"container_type": ctype, "quantity": 1}]))
+    assert any("unsupported container" in s for s in e.special_requirements)

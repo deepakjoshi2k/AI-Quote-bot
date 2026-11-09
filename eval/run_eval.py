@@ -4,7 +4,7 @@
     python -m eval.run_eval I02 I11    # just some
 
 Free tiers limit requests per minute, so the script pauses between emails
-(EVAL_PAUSE_SECONDS in .env, default 4).
+(EVAL_PAUSE_SECONDS in .env, default 12).
 
 Needs a working .env. Mock emails only (rule 3). Phase 7 will add quote totals.
 Success target (project brief): correct extraction on >= 10 of 11 samples.
@@ -70,7 +70,7 @@ def main(ids: list[str]) -> None:
     ids = ids or sorted(expected)
     llm = get_llm()
     print(f"Model: {llm.settings.provider} / {llm.settings.model}\n")
-    pause = float(os.getenv("EVAL_PAUSE_SECONDS", "4"))
+    pause = float(os.getenv("EVAL_PAUSE_SECONDS", "12"))
     passed = 0
     for i, sid in enumerate(ids):
         if i:

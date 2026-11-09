@@ -13,7 +13,7 @@ Copy what the email says into the JSON fields below. **Do not calculate anything
 - `customer_role`: who is writing. "buyer" = the importer receiving the goods ("our supplier", "we're importing/buying"). "seller" = the supplier/shipper sending goods to their customer ("our customer", "we are shipping to"). "agent" = another forwarder asking on behalf of a client ("our client", "please quote your destination charges", "advise nearest POD"). "unknown" if unclear.
 - `mode`: "sea" for containers, FCL, LCL, ports, ocean freight. "air" for air freight / airports. "road" for trucks/groupage by road. "unknown" if unclear.
 - `service`: "fcl" if whole containers are mentioned, "lcl" if the customer says LCL/groupage/consolidation or gives pallets/cartons/CBM with no container. Otherwise "unknown".
-- `containers`: one item per container size, `container_type` copied as written (e.g. "40ft high cube", "20ft", "40HC"), `quantity` as a number ("1 x 20ft" → 1).
+- `containers`: one item per container size, `container_type` copied as written (e.g. "40ft high cube", "20ft", "40HC"), `quantity` as a number ("1 x 20ft" → 1). If the size is not stated ("a container"), leave `containers` empty and set `service` to "fcl".
 - `cartons`: only if the email lists carton/package dimensions. Copy numbers and units exactly as written; set `dimension_unit` and `weight_unit` to the units used.
 - `total_volume_cbm`: only if the email states a total volume in CBM / m3 / cubic metres.
 - `total_weight` + `weight_unit`: total gross weight as written ("1,450 kg" → 1450, "kg"; "approx 14 tonnes" → 14, "t"). If only a per-carton weight is given, leave this null and put it in `cartons`.
