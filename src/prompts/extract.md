@@ -21,7 +21,7 @@ Copy what the email says into the JSON fields below. **Do not calculate anything
 - `origin_place`: the supplier's city/district if given.
 - `destination_port_name`: the port where the goods arrive (UK or EU) as written ("Felixstowe", "Rotterdam", "Le Havre"), or `null`. Do not choose a port yourself if the email doesn't name one.
 - `incoterm`: the 3-letter term exactly as written (EXW, FCA, FOB, CFR, CIF, CPT, CIP, DAP, DPU, DDP), or `null`. `incoterm_place`: the place written after it ("FOB Ningbo" → "Ningbo").
-- `delivery_required`: true if the customer asks us to deliver to the final address (door to door, deliver to our warehouse...), false if they say they will collect or only want clearance/freight, `null` if not mentioned.
+- `delivery_required`: true only if the writer asks **us (the forwarder)** to deliver to the final address (door to door, "deliver to our warehouse", "include delivery charges"). false if someone else delivers (e.g. "our supplier is delivering to us"), if they will collect, or if they only want clearance/freight. `null` if not mentioned.
 - `delivery_postcode`: the postcode of the delivery address as written (any country). `delivery_place`: delivery town and country as written, e.g. "Slough" or "Vitry-le-François, France".
 - `hazardous`: true if the email says the goods are hazardous/dangerous or gives a UN number; false only if it explicitly says not hazardous; otherwise `null`. `un_number`: e.g. "UN3480".
 - `special_requirements`: short phrases for anything special: "reefer", "temperature controlled", "flat rack", "open top", "out of gauge", "ISO tank", "vehicle", "tail-lift", "insurance". Empty list if none.

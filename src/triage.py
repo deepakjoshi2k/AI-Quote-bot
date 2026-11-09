@@ -76,8 +76,15 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
               f"Dangerous goods ({detail}): needs DG-qualified staff, IMDG booking and a Safety Data Sheet (SDS).")
 
     # 3. Who is asking? Useful context for whichever team gets it.
-    if e.customer_role in (CustomerRole.SELLER, CustomerRole.AGENT):
-        role_note = (f"Enquirer appears to be the {e.customer_role.value}, not the importer: "
+    #    Model's label OR a deterministic cue: under DAP/DDP the supplier delivers to the door,
+    #    so an "importer" who also asks us to deliver is almost certainly the seller's side.
+    seller_cue = e.incoterm in (Incoterm.DAP, Incoterm.DDP) and e.delivery_required is True
+    if e.customer_role in (CustomerRole.SELLER, CustomerRole.AGENT) or seller_cue:
+        who = e.customer_role.value if e.customer_role in (CustomerRole.SELLER, CustomerRole.AGENT) \
+            else "seller or an agent"
+        why = (f" ({e.incoterm.value} with door delivery requested: under {e.incoterm.value} the supplier "
+               "arranges delivery)") if seller_cue else ""
+        role_note = (f"Enquirer appears to be the {who}, not the importer{why}: "
                      "the Incoterm split is the other way round for them.")
         if routed_elsewhere:
             info.append(role_note)

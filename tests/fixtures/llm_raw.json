@@ -228,7 +228,7 @@
     "customer_role": "buyer"
   },
   "I12": {
-    "customer_role": "agent",
+    "customer_role": "buyer",
     "direction": "import",
     "mode": "sea",
     "service": "fcl",

@@ -145,7 +145,7 @@ def test_optional_fields_dont_block_quote():
 
 def test_dap_customs_only_needs_no_cargo_size():
     e = _quotable(incoterm=Incoterm.DAP, total_volume_cbm=None, total_gross_weight_kg=None, destination_port=None,
-                  origin_port=None, service=Service.UNKNOWN)
+                  origin_port=None, service=Service.UNKNOWN, delivery_required=False)
     assert triage(e).status == "quote"
 
 
@@ -237,3 +237,22 @@ def test_unknown_role_treated_as_importer():
 def test_cross_trade_routed():
     e = _quotable(direction="cross_trade", origin_country="CN", destination_country="US")
     assert triage(e).flags == [TriageFlag.CROSS_TRADE]
+
+
+# ---------- seller-side cue that doesn't depend on the model ----------
+
+@pytest.mark.parametrize("role", ["buyer", "unknown"])
+def test_dap_with_delivery_request_is_seller_side(role):
+    t = triage(_quotable(incoterm=Incoterm.DAP, delivery_required=True, customer_role=role))
+    assert t.status == "manual_review" and TriageFlag.CUSTOMER_NOT_BUYER in t.flags
+    assert any("supplier arranges delivery" in r for r in t.reasons)
+
+
+def test_dap_clearance_only_still_quotes():
+    # I07 pattern: DAP, importer only wants customs clearance
+    assert triage(_quotable(incoterm=Incoterm.DAP, delivery_required=False)).status == "quote"
+
+
+def test_i12_caught_even_when_model_says_buyer(fake_llm):
+    t = triage(extract_enquiry(sample_text("I12"), llm=fake_llm))
+    assert TriageFlag.CUSTOMER_NOT_BUYER in t.flags
