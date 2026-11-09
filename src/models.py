@@ -66,7 +66,8 @@ class Enquiry(BaseModel):
     service: Service = Service.UNKNOWN
     origin_country: str | None = None
     origin_place: str | None = None        # supplier city/district
-    origin_port: str | None = None         # UN/LOCODE e.g. CNSHA
+    origin_port: str | None = None         # UN/LOCODE e.g. CNSHA (only if recognised)
+    origin_port_name: str | None = None    # port as written in the email, e.g. "Santos"
     uk_port: str | None = None             # GBFXT / GBSOU / GBLGP
     containers: list[ContainerLine] = Field(default_factory=list)   # FCL
     cartons: list[CartonLine] = Field(default_factory=list)         # LCL detail
@@ -76,6 +77,7 @@ class Enquiry(BaseModel):
     commodity: str | None = None
     hazardous: bool | None = None
     un_number: str | None = None
+    special_requirements: list[str] = Field(default_factory=list)  # e.g. "reefer", "tail-lift"
     incoterm: Incoterm = Incoterm.UNKNOWN
     incoterm_place: str | None = None      # e.g. "Ningbo", "supplier premises"
     delivery_required: bool | None = None
@@ -84,10 +86,25 @@ class Enquiry(BaseModel):
     extraction_notes: list[str] = Field(default_factory=list)
 
 
+class TriageFlag(str, Enum):
+    """Machine-readable reasons, used by the pipeline to route the enquiry."""
+    EXPORT = "export"
+    NOT_SEA = "not_sea"
+    DANGEROUS_GOODS = "dangerous_goods"
+    SPECIAL_CARGO = "special_cargo"
+    DDP = "ddp"
+    LANE_NOT_IN_SHEET = "lane_not_in_sheet"
+    UK_PORT_NOT_IN_SHEET = "uk_port_not_in_sheet"
+    MANUAL_DELIVERY_AREA = "manual_delivery_area"
+    HEAVY_CONTAINER = "heavy_container"
+    PORT_HEALTH = "port_health"          # informational only, does not block a quote
+
+
 class Triage(BaseModel):
     status: TriageStatus
     reasons: list[str] = Field(default_factory=list)
     missing_fields: list[str] = Field(default_factory=list)
+    flags: list[TriageFlag] = Field(default_factory=list)
 
 
 class ChargeSections(BaseModel):
@@ -129,3 +146,50 @@ class Quote(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
     exclusions: list[str]                  # always includes duties & import VAT
     is_mock: bool = True
+
+
+# ---------- what the LLM returns (raw, before Python normalisation) ----------
+# The LLM only copies what the email says, with units as written. Python converts
+# units, maps ports to codes, computes CBM, etc. (rule 1: no maths in the LLM).
+
+class RawContainerLine(BaseModel):
+    container_type: str                    # as written: "40ft high cube", "20'", "40HC"
+    quantity: int = 1
+
+
+class RawCartonLine(BaseModel):
+    quantity: int
+    length: float
+    width: float
+    height: float
+    dimension_unit: Literal["cm", "mm", "m", "in"] = "cm"
+    weight_each: float | None = None
+    weight_unit: Literal["kg", "lb", "t"] = "kg"
+
+
+class RawEnquiry(BaseModel):
+    customer_name: str | None = None
+    contact_email: str | None = None
+    direction: Literal["import", "export", "unknown"] = "unknown"
+    mode: Literal["sea", "air", "road", "unknown"] = "unknown"
+    service: Literal["fcl", "lcl", "unknown"] = "unknown"
+    origin_country: str | None = None      # ISO 3166 alpha-2, e.g. "CN"
+    origin_place: str | None = None
+    origin_port_name: str | None = None
+    uk_port_name: str | None = None
+    containers: list[RawContainerLine] = Field(default_factory=list)
+    cartons: list[RawCartonLine] = Field(default_factory=list)
+    total_volume_cbm: float | None = None  # only if stated in CBM / m3
+    total_weight: float | None = None
+    weight_unit: Literal["kg", "lb", "t"] = "kg"
+    pallets: int | None = None
+    commodity: str | None = None
+    hazardous: bool | None = None
+    un_number: str | None = None
+    special_requirements: list[str] = Field(default_factory=list)
+    incoterm: str | None = None            # as written, e.g. "FOB"
+    incoterm_place: str | None = None
+    delivery_required: bool | None = None
+    delivery_postcode: str | None = None
+    ready_date: date | None = None
+    notes: list[str] = Field(default_factory=list)

@@ -41,6 +41,29 @@ def kg_to_tonnes(kg: float) -> float:
     return kg / KG_PER_TONNE
 
 
+def tonnes_to_kg(tonnes: float) -> float:
+    _check_non_negative(tonnes=tonnes)
+    return tonnes * KG_PER_TONNE
+
+
+def to_cm(value: float, unit: str) -> float:
+    """Convert a length in cm / mm / m / in to cm."""
+    _check_non_negative(value=value)
+    factors = {"cm": 1.0, "mm": 0.1, "m": 100.0, "in": CM_PER_INCH}
+    if unit not in factors:
+        raise ValueError(f"Unknown length unit {unit!r}")
+    return value * factors[unit]
+
+
+def to_kg(value: float, unit: str) -> float:
+    """Convert a weight in kg / lb / t to kg."""
+    _check_non_negative(value=value)
+    factors = {"kg": 1.0, "lb": KG_PER_LB, "t": float(KG_PER_TONNE)}
+    if unit not in factors:
+        raise ValueError(f"Unknown weight unit {unit!r}")
+    return value * factors[unit]
+
+
 def cm3_to_cbm(cm3: float) -> float:
     _check_non_negative(cm3=cm3)
     return cm3 / CM3_PER_CBM

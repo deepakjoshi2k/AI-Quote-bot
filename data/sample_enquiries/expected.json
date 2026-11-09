@@ -1,0 +1,181 @@
+{
+  "I01": {
+    "status": "quote",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "containers": [
+      {
+        "container_type": "40HC",
+        "quantity": 1
+      }
+    ],
+    "origin_port": "CNNGB",
+    "uk_port": "GBFXT",
+    "incoterm": "FOB",
+    "delivery_required": true,
+    "delivery_postcode": "SL1 4QP",
+    "zone": "1",
+    "hazardous": false,
+    "ready_date": "2026-11-20",
+    "flags": []
+  },
+  "I02": {
+    "status": "quote",
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_port": "CNSHA",
+    "uk_port": "GBFXT",
+    "incoterm": "EXW",
+    "total_volume_cbm": 4.8,
+    "total_gross_weight_kg": 1450,
+    "pallets": 6,
+    "delivery_required": true,
+    "delivery_postcode": "SL3 0HJ",
+    "zone": "1",
+    "flags": []
+  },
+  "I03": {
+    "status": "quote",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "containers": [
+      {
+        "container_type": "20GP",
+        "quantity": 1
+      }
+    ],
+    "origin_port": "INNSA",
+    "uk_port": "GBLGP",
+    "incoterm": "CIF",
+    "total_gross_weight_kg": 14000,
+    "delivery_required": true,
+    "delivery_postcode": "LE4 9HA",
+    "zone": "2",
+    "flags": []
+  },
+  "I04": {
+    "status": "need_info",
+    "direction": "import",
+    "mode": "sea",
+    "origin_country": "VN",
+    "origin_port": null,
+    "incoterm": "UNKNOWN",
+    "missing_contains": [
+      "container size",
+      "origin port",
+      "commodity",
+      "Incoterm",
+      "delivery postcode",
+      "ready date",
+      "hazardous"
+    ],
+    "flags": []
+  },
+  "I05": {
+    "status": "manual_review",
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_port": "CNSHA",
+    "incoterm": "FOB",
+    "total_volume_cbm": 1.2,
+    "total_gross_weight_kg": 600,
+    "un_number": "UN3480",
+    "delivery_postcode": "RG2 0QX",
+    "flags": [
+      "dangerous_goods"
+    ]
+  },
+  "I06": {
+    "status": "manual_review",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "containers": [
+      {
+        "container_type": "20GP",
+        "quantity": 1
+      }
+    ],
+    "origin_port": "BRSSZ",
+    "uk_port": "GBFXT",
+    "incoterm": "FOB",
+    "delivery_postcode": "BS2 0XS",
+    "zone": "3",
+    "flags": [
+      "lane_not_in_sheet",
+      "port_health"
+    ]
+  },
+  "I07": {
+    "status": "quote",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "containers": [
+      {
+        "container_type": "40HC",
+        "quantity": 2
+      }
+    ],
+    "origin_port": null,
+    "uk_port": "GBFXT",
+    "incoterm": "DAP",
+    "delivery_postcode": "MK1 1AA",
+    "flags": []
+  },
+  "I08": {
+    "status": "manual_review",
+    "direction": "import",
+    "mode": "air",
+    "incoterm": "DAP",
+    "total_gross_weight_kg": 90,
+    "flags": [
+      "not_sea"
+    ]
+  },
+  "I09": {
+    "status": "manual_review",
+    "direction": "export",
+    "mode": "sea",
+    "incoterm": "FOB",
+    "flags": [
+      "export"
+    ]
+  },
+  "I10": {
+    "status": "quote",
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_port": "VNSGN",
+    "uk_port": "GBSOU",
+    "incoterm": "FOB",
+    "total_volume_cbm": 0.6,
+    "total_gross_weight_kg": 210,
+    "pallets": 1,
+    "delivery_required": true,
+    "delivery_postcode": "RG2 0QX",
+    "zone": "2",
+    "flags": []
+  },
+  "I11": {
+    "status": "quote",
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_port": "INNSA",
+    "uk_port": "GBFXT",
+    "incoterm": "FOB",
+    "total_volume_cbm": 4.8,
+    "total_gross_weight_kg": 720,
+    "pallets": 3,
+    "delivery_required": true,
+    "delivery_postcode": "B6 7JH",
+    "zone": "2",
+    "flags": []
+  }
+}

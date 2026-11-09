@@ -1,0 +1,205 @@
+{
+  "I01": {
+    "customer_name": "Priya Shah",
+    "contact_email": "priya@brightfit-interiors.co.uk",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "origin_country": "CN",
+    "origin_place": "Ningbo",
+    "origin_port_name": "Ningbo",
+    "uk_port_name": "Felixstowe",
+    "containers": [
+      {
+        "container_type": "40ft high cube",
+        "quantity": 1
+      }
+    ],
+    "commodity": "flat-pack office furniture",
+    "hazardous": false,
+    "incoterm": "FOB",
+    "incoterm_place": "Ningbo",
+    "delivery_required": true,
+    "delivery_postcode": "SL1 4QP",
+    "ready_date": "2026-11-20"
+  },
+  "I02": {
+    "customer_name": "Ahmed Khan",
+    "contact_email": "ahmed@brightled.co.uk",
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_country": "CN",
+    "origin_place": "Songjiang, Shanghai",
+    "origin_port_name": "Shanghai",
+    "total_volume_cbm": 4.8,
+    "total_weight": 1450,
+    "weight_unit": "kg",
+    "pallets": 6,
+    "commodity": "LED lighting",
+    "incoterm": "EXW",
+    "delivery_required": true,
+    "delivery_postcode": "SL3 0HJ",
+    "notes": [
+      "Port of loading assumed Shanghai from supplier location"
+    ]
+  },
+  "I03": {
+    "customer_name": "Tom Reed",
+    "contact_email": "t.reed@midlandsmachining.co.uk",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "origin_country": "IN",
+    "origin_port_name": "Nhava Sheva",
+    "uk_port_name": "London Gateway",
+    "containers": [
+      {
+        "container_type": "20ft",
+        "quantity": 1
+      }
+    ],
+    "total_weight": 14,
+    "weight_unit": "t",
+    "commodity": "machine spare parts",
+    "incoterm": "CIF",
+    "delivery_required": true,
+    "delivery_postcode": "LE4 9HA"
+  },
+  "I04": {
+    "customer_name": "Mark",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "origin_country": "VN"
+  },
+  "I05": {
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_country": "CN",
+    "origin_port_name": "Shanghai",
+    "total_volume_cbm": 1.2,
+    "total_weight": 600,
+    "weight_unit": "kg",
+    "pallets": 2,
+    "commodity": "lithium-ion battery packs",
+    "hazardous": true,
+    "un_number": "UN3480",
+    "incoterm": "FOB",
+    "delivery_required": true,
+    "delivery_postcode": "RG2 0QX"
+  },
+  "I06": {
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "origin_country": "BR",
+    "origin_port_name": "Santos",
+    "uk_port_name": "Felixstowe",
+    "containers": [
+      {
+        "container_type": "20ft",
+        "quantity": 1
+      }
+    ],
+    "commodity": "green coffee beans",
+    "incoterm": "FOB",
+    "incoterm_place": "Santos",
+    "delivery_required": true,
+    "delivery_postcode": "BS2 0XS"
+  },
+  "I07": {
+    "customer_name": "Lucy Grant",
+    "contact_email": "lucy@mkhomewares.co.uk",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "uk_port_name": "Felixstowe",
+    "containers": [
+      {
+        "container_type": "40HC",
+        "quantity": 2
+      }
+    ],
+    "commodity": "homewares",
+    "incoterm": "DAP",
+    "incoterm_place": "Milton Keynes warehouse",
+    "delivery_required": false,
+    "delivery_postcode": "MK1 1AA"
+  },
+  "I08": {
+    "direction": "import",
+    "mode": "air",
+    "origin_country": "IN",
+    "origin_place": "Delhi",
+    "cartons": [],
+    "total_weight": 90,
+    "weight_unit": "kg",
+    "commodity": "textile samples",
+    "incoterm": "DAP",
+    "incoterm_place": "Heathrow"
+  },
+  "I09": {
+    "direction": "export",
+    "mode": "sea",
+    "service": "fcl",
+    "origin_country": "GB",
+    "origin_place": "Birmingham",
+    "uk_port_name": "Felixstowe",
+    "containers": [
+      {
+        "container_type": "20ft",
+        "quantity": 1
+      }
+    ],
+    "incoterm": "FOB",
+    "incoterm_place": "Felixstowe"
+  },
+  "I10": {
+    "customer_name": "Nina Patel",
+    "contact_email": "nina@saigonhome.co.uk",
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_country": "VN",
+    "origin_port_name": "Ho Chi Minh City",
+    "uk_port_name": "Southampton",
+    "total_volume_cbm": 0.6,
+    "total_weight": 210,
+    "weight_unit": "kg",
+    "pallets": 1,
+    "commodity": "ceramic tableware",
+    "incoterm": "FOB",
+    "incoterm_place": "Ho Chi Minh City",
+    "delivery_required": true,
+    "delivery_postcode": "RG2 0QX"
+  },
+  "I11": {
+    "customer_name": "Daniel Okafor",
+    "contact_email": "dan@okafortextiles.co.uk",
+    "direction": "import",
+    "mode": "sea",
+    "service": "lcl",
+    "origin_country": "IN",
+    "origin_port_name": "Nhava Sheva",
+    "uk_port_name": "Felixstowe",
+    "cartons": [
+      {
+        "quantity": 40,
+        "length": 60,
+        "width": 40,
+        "height": 50,
+        "dimension_unit": "cm",
+        "weight_each": 18,
+        "weight_unit": "kg"
+      }
+    ],
+    "pallets": 3,
+    "commodity": "cotton garments",
+    "incoterm": "FOB",
+    "incoterm_place": "Nhava Sheva",
+    "delivery_required": true,
+    "delivery_postcode": "B6 7JH"
+  }
+}

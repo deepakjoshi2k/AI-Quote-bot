@@ -10,3 +10,50 @@ service_thresholds:
   fcl_min_cbm: 15.0       # above this, suggest FCL; in between, either
 fcl:
   heavy_20gp_kg: 20000    # flag a 20GP heavier than this
+default_uk_port: GBFXT    # used when the email names no UK port and the sheet has several
+cbm_mismatch_tolerance: 0.05   # note it if stated CBM and carton CBM differ by more than 5%
+
+# Triage keyword lists (regular expressions, case-insensitive, matched on commodity + special requirements).
+# Edit these to match Lincoln Cargo's own rules.
+triage:
+  dg_patterns:
+    - '\bbatter(y|ies)\b'
+    - '\blithium\b'
+    - '\baerosols?\b'
+    - '\bperfumes?\b'
+    - '\bpaints?\b'
+    - '\bchemicals?\b'
+    - '\bflammable\b'
+    - '\bcorrosive\b'
+    - '\bgas(es)?\b'
+    - '\bhazard(ous)?\b'
+    - '\bexplosives?\b'
+    - '\bfireworks?\b'
+    - '\bUN ?\d{4}\b'
+  special_patterns:
+    - '\biso ?tanks?\b'
+    - '\btank containers?\b'
+    - '\bflat ?racks?\b'
+    - '\bopen ?tops?\b'
+    - '\bout of gauge\b'
+    - '\bOOG\b'
+    - '\breefers?\b'
+    - '\brefrigerated\b'
+    - '\btemperature[- ]controlled\b'
+    - '\bfrozen\b'
+    - '\bvehicles?\b'
+    - '\bcars?\b(?! ?(parts|spares|accessories))'
+    - '\bunsupported\b'
+  port_health_patterns:
+    - '\bfood\b'
+    - '\bcoffee\b'
+    - '\btea\b'
+    - '\bspices?\b'
+    - '\brice\b'
+    - '\bnuts?\b'
+    - '\bfruits?\b'
+    - '\bmeat\b'
+    - '\bfish\b'
+    - '\bseeds?\b'
+    - '\bplants?\b'
+    - '\btimber\b'
