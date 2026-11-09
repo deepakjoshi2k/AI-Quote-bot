@@ -1,0 +1,5 @@
+zone,description,postcode_areas
+1,London / M25 / Heathrow corridor,E;EC;N;NW;SE;SW;W;WC;SL;UB;TW;HA;KT;EN;IG;RM;BR;CR;SM;DA;WD
+2,South East / East / Midlands,RG;HP;OX;LU;MK;GU;CM;SS;ME;CT;TN;RH;BN;PO;SO;CB;NN;AL;SG;CO;IP;B;CV;LE;NG;DE;WS;WV;DY;NR;PE
+3,Rest of mainland GB,ALL OTHER GB MAINLAND
+MANUAL,Northern Ireland / Scottish Highlands & Islands / Isle of Man / Channel Islands,BT;IV;HS;KW;ZE;PA;PH;IM;GY;JE

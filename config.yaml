@@ -1,0 +1,12 @@
+# Business parameters. MOCK values for the prototype: confirm with Lincoln Cargo.
+currency: GBP
+margin_pct: 15            # % of subtotal
+validity_days: 14
+lcl:
+  min_wm: 1.0             # minimum revenue tonnes
+  cbm_per_pallet: 1.6     # used only when the pallet count is not given
+service_thresholds:
+  lcl_max_cbm: 13.0       # below this, suggest LCL
+  fcl_min_cbm: 15.0       # above this, suggest FCL; in between, either
+fcl:
+  heavy_20gp_kg: 20000    # flag a 20GP heavier than this

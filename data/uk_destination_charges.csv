@@ -1,0 +1,9 @@
+service,uk_port,code,description,basis,rate,min_charge,currency,data_status
+FCL,GBFXT,DTHC,Destination terminal handling (Felixstowe),per container,245.00,0,GBP,MOCK - NOT REAL RATES
+FCL,GBSOU,DTHC,Destination terminal handling (Southampton),per container,255.00,0,GBP,MOCK - NOT REAL RATES
+FCL,GBLGP,DTHC,Destination terminal handling (London Gateway),per container,250.00,0,GBP,MOCK - NOT REAL RATES
+FCL,ALL,DO,Delivery order / release fee,per bill of lading,65.00,0,GBP,MOCK - NOT REAL RATES
+LCL,ALL,DCFS,Destination CFS / devanning,per W/M,32.00,32.00,GBP,MOCK - NOT REAL RATES
+LCL,ALL,DO,Delivery order / release fee,per bill of lading,55.00,0,GBP,MOCK - NOT REAL RATES
+ALL,ALL,IMPCLR,Import customs entry (CDS),per entry,65.00,0,GBP,MOCK - NOT REAL RATES
+ALL,ALL,DUTYVAT,UK import duty and import VAT,at cost (paid to HMRC),0,0,GBP,NOT INCLUDED - pass-through

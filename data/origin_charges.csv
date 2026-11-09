@@ -1,0 +1,41 @@
+origin_port,service,code,description,basis,rate,min_charge,buyer_pays_when_incoterm,currency,data_status
+CNSHA,LCL,PICKUP,Collection from supplier (within 50 km of port),per shipment,120.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNSHA,LCL,EXPCLR,Origin export customs clearance,per shipment,55.00,0,EXW,GBP,MOCK - NOT REAL RATES
+CNSHA,LCL,OCFS,Origin CFS / handling,per W/M,15.00,15.00,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNSHA,LCL,ODOC,Origin documentation,per shipment,30.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNSHA,FCL,PICKUP,Container haulage from supplier (within 50 km),per container,260.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNSHA,FCL,EXPCLR,Origin export customs clearance,per shipment,55.00,0,EXW,GBP,MOCK - NOT REAL RATES
+CNSHA,FCL,OTHC,Origin terminal handling,per container,140.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNSHA,FCL,ODOC,Origin documentation,per shipment,30.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNNGB,LCL,PICKUP,Collection from supplier (within 50 km of port),per shipment,120.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNNGB,LCL,EXPCLR,Origin export customs clearance,per shipment,55.00,0,EXW,GBP,MOCK - NOT REAL RATES
+CNNGB,LCL,OCFS,Origin CFS / handling,per W/M,15.00,15.00,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNNGB,LCL,ODOC,Origin documentation,per shipment,30.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNNGB,FCL,PICKUP,Container haulage from supplier (within 50 km),per container,260.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNNGB,FCL,EXPCLR,Origin export customs clearance,per shipment,55.00,0,EXW,GBP,MOCK - NOT REAL RATES
+CNNGB,FCL,OTHC,Origin terminal handling,per container,140.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+CNNGB,FCL,ODOC,Origin documentation,per shipment,30.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+INNSA,LCL,PICKUP,Collection from supplier (within 50 km of port),per shipment,102.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+INNSA,LCL,EXPCLR,Origin export customs clearance,per shipment,46.75,0,EXW,GBP,MOCK - NOT REAL RATES
+INNSA,LCL,OCFS,Origin CFS / handling,per W/M,12.75,12.75,EXW;FCA,GBP,MOCK - NOT REAL RATES
+INNSA,LCL,ODOC,Origin documentation,per shipment,25.50,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+INNSA,FCL,PICKUP,Container haulage from supplier (within 50 km),per container,221.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+INNSA,FCL,EXPCLR,Origin export customs clearance,per shipment,46.75,0,EXW,GBP,MOCK - NOT REAL RATES
+INNSA,FCL,OTHC,Origin terminal handling,per container,119.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+INNSA,FCL,ODOC,Origin documentation,per shipment,25.50,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+VNSGN,LCL,PICKUP,Collection from supplier (within 50 km of port),per shipment,108.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+VNSGN,LCL,EXPCLR,Origin export customs clearance,per shipment,49.50,0,EXW,GBP,MOCK - NOT REAL RATES
+VNSGN,LCL,OCFS,Origin CFS / handling,per W/M,13.50,13.50,EXW;FCA,GBP,MOCK - NOT REAL RATES
+VNSGN,LCL,ODOC,Origin documentation,per shipment,27.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+VNSGN,FCL,PICKUP,Container haulage from supplier (within 50 km),per container,234.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+VNSGN,FCL,EXPCLR,Origin export customs clearance,per shipment,49.50,0,EXW,GBP,MOCK - NOT REAL RATES
+VNSGN,FCL,OTHC,Origin terminal handling,per container,126.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+VNSGN,FCL,ODOC,Origin documentation,per shipment,27.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+AEJEA,LCL,PICKUP,Collection from supplier (within 50 km of port),per shipment,132.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+AEJEA,LCL,EXPCLR,Origin export customs clearance,per shipment,60.50,0,EXW,GBP,MOCK - NOT REAL RATES
+AEJEA,LCL,OCFS,Origin CFS / handling,per W/M,16.50,16.50,EXW;FCA,GBP,MOCK - NOT REAL RATES
+AEJEA,LCL,ODOC,Origin documentation,per shipment,33.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+AEJEA,FCL,PICKUP,Container haulage from supplier (within 50 km),per container,286.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+AEJEA,FCL,EXPCLR,Origin export customs clearance,per shipment,60.50,0,EXW,GBP,MOCK - NOT REAL RATES
+AEJEA,FCL,OTHC,Origin terminal handling,per container,154.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
+AEJEA,FCL,ODOC,Origin documentation,per shipment,33.00,0,EXW;FCA,GBP,MOCK - NOT REAL RATES
