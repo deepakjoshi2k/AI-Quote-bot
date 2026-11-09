@@ -6,7 +6,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLES = ROOT / "data" / "sample_enquiries"
-SAMPLE_IDS = [f"I{i:02d}" for i in range(1, 12)]
+SAMPLE_IDS = [f"I{i:02d}" for i in range(1, 13)]
 
 
 class FakeLLM:

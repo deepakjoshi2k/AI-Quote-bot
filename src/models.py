@@ -18,8 +18,16 @@ class Service(str, Enum):
 
 
 class Direction(str, Enum):
-    IMPORT = "import"
-    EXPORT = "export"
+    IMPORT = "import"            # destination in the UK or the EU
+    EXPORT = "export"            # origin in the UK/EU, destination outside it
+    CROSS_TRADE = "cross_trade"  # neither end in the UK/EU
+    UNKNOWN = "unknown"
+
+
+class CustomerRole(str, Enum):
+    BUYER = "buyer"      # the importer / consignee (what the Incoterm table assumes)
+    SELLER = "seller"    # the supplier / shipper
+    AGENT = "agent"      # another forwarder asking on behalf of a client
     UNKNOWN = "unknown"
 
 
@@ -61,11 +69,13 @@ class CartonLine(BaseModel):
 class Enquiry(BaseModel):
     customer_name: str | None = None
     contact_email: str | None = None
+    customer_role: CustomerRole = CustomerRole.UNKNOWN
     direction: Direction = Direction.UNKNOWN
     mode: Mode = Mode.UNKNOWN
     service: Service = Service.UNKNOWN
-    origin_country: str | None = None
+    origin_country: str | None = None      # ISO 2-letter
     origin_place: str | None = None        # supplier city/district
+    destination_country: str | None = None # ISO 2-letter; GB for the UK
     origin_port: str | None = None         # UN/LOCODE e.g. CNSHA (only if recognised)
     origin_port_name: str | None = None    # port as written in the email, e.g. "Santos"
     uk_port: str | None = None             # GBFXT / GBSOU / GBLGP
@@ -81,7 +91,8 @@ class Enquiry(BaseModel):
     incoterm: Incoterm = Incoterm.UNKNOWN
     incoterm_place: str | None = None      # e.g. "Ningbo", "supplier premises"
     delivery_required: bool | None = None
-    delivery_postcode: str | None = None
+    delivery_postcode: str | None = None   # normalised if UK, as written otherwise
+    delivery_place: str | None = None      # town / address as written
     ready_date: date | None = None
     extraction_notes: list[str] = Field(default_factory=list)
 
@@ -89,6 +100,9 @@ class Enquiry(BaseModel):
 class TriageFlag(str, Enum):
     """Machine-readable reasons, used by the pipeline to route the enquiry."""
     EXPORT = "export"
+    CROSS_TRADE = "cross_trade"
+    NON_UK_DESTINATION = "non_uk_destination"   # e.g. EU delivery: no rates in v1
+    CUSTOMER_NOT_BUYER = "customer_not_buyer"
     NOT_SEA = "not_sea"
     DANGEROUS_GOODS = "dangerous_goods"
     SPECIAL_CARGO = "special_cargo"
@@ -170,11 +184,13 @@ class RawCartonLine(BaseModel):
 class RawEnquiry(BaseModel):
     customer_name: str | None = None
     contact_email: str | None = None
-    direction: Literal["import", "export", "unknown"] = "unknown"
+    customer_role: Literal["buyer", "seller", "agent", "unknown"] = "unknown"
+    direction: Literal["import", "export", "cross_trade", "unknown"] = "unknown"
     mode: Literal["sea", "air", "road", "unknown"] = "unknown"
     service: Literal["fcl", "lcl", "unknown"] = "unknown"
     origin_country: str | None = None      # ISO 3166 alpha-2, e.g. "CN"
     origin_place: str | None = None
+    destination_country: str | None = None # ISO 3166 alpha-2, "GB" for the UK
     origin_port_name: str | None = None
     uk_port_name: str | None = None
     containers: list[RawContainerLine] = Field(default_factory=list)
@@ -191,5 +207,6 @@ class RawEnquiry(BaseModel):
     incoterm_place: str | None = None
     delivery_required: bool | None = None
     delivery_postcode: str | None = None
+    delivery_place: str | None = None
     ready_date: date | None = None
     notes: list[str] = Field(default_factory=list)

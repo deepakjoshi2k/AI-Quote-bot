@@ -14,7 +14,7 @@ import re
 from src.config import load_config
 from src.incoterms import charge_sections
 from src.models import (
-    ChargeSections, Direction, Enquiry, Incoterm, Mode, Service, Triage, TriageFlag,
+    ChargeSections, CustomerRole, Direction, Enquiry, Incoterm, Mode, Service, Triage, TriageFlag,
 )
 from src.rates import RateBook, load_rate_book
 from src.zones import MANUAL, normalise_postcode, zone_for_postcode
@@ -50,18 +50,43 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
             flags.append(flag)
         reasons.append(reason)
 
+    # 1. Routing: is this enquiry for another team? (v1 prices UK sea imports only)
     if e.direction is Direction.EXPORT:
-        block(TriageFlag.EXPORT, "Export enquiry: this agent handles UK imports only. Route to the export team.")
+        block(TriageFlag.EXPORT, "Export enquiry (goods leaving the UK/EU): route to the export team.")
+    elif e.direction is Direction.CROSS_TRADE:
+        block(TriageFlag.CROSS_TRADE, f"Cross-trade ({e.origin_country} → {e.destination_country}): "
+                                      "neither end is in the UK/EU. Route to the overseas/partner desk.")
+    elif (e.direction is Direction.IMPORT and e.destination_country
+          and e.destination_country not in cfg["priced_destination_countries"]):
+        place = e.delivery_place or e.destination_country
+        block(TriageFlag.NON_UK_DESTINATION,
+              f"Import into {e.destination_country} ({place}): v1 only has UK destination rates. "
+              "Route to the European desk for destination port, customs and delivery charges.")
     if e.mode in (Mode.AIR, Mode.ROAD):
-        block(TriageFlag.NOT_SEA, f"{e.mode.value.title()} freight enquiry: this agent covers sea imports only. "
+        block(TriageFlag.NOT_SEA, f"{e.mode.value.title()} freight enquiry: this agent covers sea freight only. "
                                   f"Route to the {e.mode.value} team.")
+    routed_elsewhere = bool(reasons)
 
+    # 2. Dangerous goods matter to every team, so always check.
     cargo_text = " ".join(filter(None, [e.commodity, *e.special_requirements]))
     dg_hits = _matches(tcfg["dg_patterns"], cargo_text)
     if e.hazardous or e.un_number or dg_hits:
         detail = e.un_number or (e.commodity or "hazardous cargo")
         block(TriageFlag.DANGEROUS_GOODS,
               f"Dangerous goods ({detail}): needs DG-qualified staff, IMDG booking and a Safety Data Sheet (SDS).")
+
+    # 3. Who is asking? Useful context for whichever team gets it.
+    if e.customer_role in (CustomerRole.SELLER, CustomerRole.AGENT):
+        role_note = (f"Enquirer appears to be the {e.customer_role.value}, not the importer: "
+                     "the Incoterm split is the other way round for them.")
+        if routed_elsewhere:
+            info.append(role_note)
+        else:
+            block(TriageFlag.CUSTOMER_NOT_BUYER, role_note + " v1 only auto-quotes importers. Quote manually.")
+
+    # The remaining checks are about pricing a UK sea import; skip them if it's going elsewhere.
+    if routed_elsewhere:
+        return reasons, flags, info
 
     for item in e.special_requirements:
         if _matches(tcfg["special_patterns"], item):
@@ -125,7 +150,7 @@ def _missing_fields(e: Enquiry, sections: ChargeSections | None, cfg: dict) -> t
     opt: list[str] = []
 
     if e.direction is Direction.UNKNOWN:
-        req.append("direction (import into the UK or export)")
+        req.append("where the goods are coming from and going to (countries)")
     if e.mode is Mode.UNKNOWN:
         req.append("transport mode (sea, air or road)")
     if e.incoterm is Incoterm.UNKNOWN:

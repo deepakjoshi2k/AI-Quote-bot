@@ -19,7 +19,8 @@ def test_sample_enquiry(sid, fake_llm, expected):
     assert sorted(f.value for f in t.flags) == sorted(exp["flags"])
 
     for field in ["direction", "mode", "service", "origin_port", "uk_port", "incoterm", "un_number",
-                  "delivery_required", "delivery_postcode", "pallets", "hazardous", "origin_country"]:
+                  "delivery_required", "delivery_postcode", "pallets", "hazardous", "origin_country",
+                  "destination_country"]:
         if field in exp:
             value = getattr(e, field)
             assert (value.value if hasattr(value, "value") else value) == exp[field], field
@@ -146,3 +147,35 @@ def test_dap_customs_only_needs_no_cargo_size():
     e = _quotable(incoterm=Incoterm.DAP, total_volume_cbm=None, total_gross_weight_kg=None, uk_port=None,
                   origin_port=None, service=Service.UNKNOWN)
     assert triage(e).status == "quote"
+
+
+# ---------- Phase 3.1: direction from countries, routing, customer role ----------
+
+def test_air_enquiry_only_routes_to_air_team(fake_llm):
+    t = triage(extract_enquiry(sample_text("I08"), llm=fake_llm))
+    assert t.flags == [TriageFlag.NOT_SEA]   # no noise about Heathrow not being a sea port
+
+
+def test_air_dg_still_flagged():
+    e = _quotable(mode="air", commodity="lithium batteries")
+    assert set(triage(e).flags) == {TriageFlag.NOT_SEA, TriageFlag.DANGEROUS_GOODS}
+
+
+def test_eu_destination_routed_with_role_note(fake_llm):
+    t = triage(extract_enquiry(sample_text("I12"), llm=fake_llm))
+    assert t.flags == [TriageFlag.NON_UK_DESTINATION]          # heavy-20GP / UK checks skipped
+    assert any("agent" in r for r in t.reasons)
+
+
+def test_seller_asking_is_manual():
+    t = triage(_quotable(customer_role="seller"))
+    assert t.status == "manual_review" and TriageFlag.CUSTOMER_NOT_BUYER in t.flags
+
+
+def test_unknown_role_treated_as_importer():
+    assert triage(_quotable(customer_role="unknown")).status == "quote"
+
+
+def test_cross_trade_routed():
+    e = _quotable(direction="cross_trade", origin_country="CN", destination_country="US")
+    assert triage(e).flags == [TriageFlag.CROSS_TRADE]

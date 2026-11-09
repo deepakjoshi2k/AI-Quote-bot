@@ -18,7 +18,8 @@
     "zone": "1",
     "hazardous": false,
     "ready_date": "2026-11-20",
-    "flags": []
+    "flags": [],
+    "destination_country": "GB"
   },
   "I02": {
     "status": "quote",
@@ -34,7 +35,8 @@
     "delivery_required": true,
     "delivery_postcode": "SL3 0HJ",
     "zone": "1",
-    "flags": []
+    "flags": [],
+    "destination_country": "GB"
   },
   "I03": {
     "status": "quote",
@@ -54,7 +56,8 @@
     "delivery_required": true,
     "delivery_postcode": "LE4 9HA",
     "zone": "2",
-    "flags": []
+    "flags": [],
+    "destination_country": "GB"
   },
   "I04": {
     "status": "need_info",
@@ -72,7 +75,8 @@
       "ready date",
       "hazardous"
     ],
-    "flags": []
+    "flags": [],
+    "destination_country": "GB"
   },
   "I05": {
     "status": "manual_review",
@@ -87,7 +91,8 @@
     "delivery_postcode": "RG2 0QX",
     "flags": [
       "dangerous_goods"
-    ]
+    ],
+    "destination_country": "GB"
   },
   "I06": {
     "status": "manual_review",
@@ -108,7 +113,8 @@
     "flags": [
       "lane_not_in_sheet",
       "port_health"
-    ]
+    ],
+    "destination_country": "GB"
   },
   "I07": {
     "status": "quote",
@@ -125,7 +131,8 @@
     "uk_port": "GBFXT",
     "incoterm": "DAP",
     "delivery_postcode": "MK1 1AA",
-    "flags": []
+    "flags": [],
+    "destination_country": "GB"
   },
   "I08": {
     "status": "manual_review",
@@ -135,7 +142,8 @@
     "total_gross_weight_kg": 90,
     "flags": [
       "not_sea"
-    ]
+    ],
+    "destination_country": "GB"
   },
   "I09": {
     "status": "manual_review",
@@ -144,7 +152,9 @@
     "incoterm": "FOB",
     "flags": [
       "export"
-    ]
+    ],
+    "origin_country": "GB",
+    "destination_country": "AE"
   },
   "I10": {
     "status": "quote",
@@ -160,7 +170,8 @@
     "delivery_required": true,
     "delivery_postcode": "RG2 0QX",
     "zone": "2",
-    "flags": []
+    "flags": [],
+    "destination_country": "GB"
   },
   "I11": {
     "status": "quote",
@@ -176,6 +187,27 @@
     "delivery_required": true,
     "delivery_postcode": "B6 7JH",
     "zone": "2",
-    "flags": []
+    "flags": [],
+    "destination_country": "GB"
+  },
+  "I12": {
+    "status": "manual_review",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "containers": [
+      {
+        "container_type": "20GP",
+        "quantity": 1
+      }
+    ],
+    "destination_country": "FR",
+    "origin_country": null,
+    "incoterm": "DAP",
+    "total_gross_weight_kg": 21000,
+    "delivery_postcode": "51300",
+    "flags": [
+      "non_uk_destination"
+    ]
   }
 }
