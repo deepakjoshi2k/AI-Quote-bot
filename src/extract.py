@@ -43,10 +43,17 @@ def extract_raw(text: str, llm: LLMClient | None = None) -> RawEnquiry:
 
 # ---------- 2. Python normalisation ----------
 
+_SPECIAL_CONTAINER = r"reefer|\brf\b|\brh\b|open ?top|\bot\b|flat ?rack|\bfr\b|tank"
+
+
+def is_special_container(raw: str) -> bool:
+    return bool(re.search(_SPECIAL_CONTAINER, raw.lower().replace("-", " ")))
+
+
 def normalise_container_type(raw: str) -> str | None:
     """'40ft high cube' -> '40HC', "20'" -> '20GP'. Specials (reefer, open top...) or 45ft -> None."""
     s = raw.lower().replace("-", " ")
-    if re.search(r"reefer|\brf\b|\brh\b|open ?top|\bot\b|flat ?rack|\bfr\b|tank|45", s):
+    if re.search(_SPECIAL_CONTAINER + r"|45", s):
         return None
     compact = re.sub(r"[\s'\"’]|ft|foot|feet", "", s)
     if compact.startswith("20"):
@@ -134,9 +141,14 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
 
     # Containers
     containers: list[ContainerLine] = []
+    container_size_unknown = False
     for c in raw.containers:
         ctype = normalise_container_type(c.container_type)
-        if ctype is None:
+        if ctype is None and not re.search(r"\d", c.container_type) and not is_special_container(c.container_type):
+            # "a container", "FCL", "full container": size not given -> ask, don't reject
+            container_size_unknown = True
+            notes.append(f"Container size not stated ({c.container_type!r})")
+        elif ctype is None:
             special.append(f"unsupported container type: {c.container_type}")
         elif c.quantity > 0:
             containers.append(ContainerLine(container_type=ctype, quantity=c.quantity))
@@ -184,7 +196,7 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
     destination_port = rb.port_code(raw.destination_port_name)
 
     # Service
-    if containers:
+    if containers or container_size_unknown:
         service = Service.FCL
     elif raw.service in ("lcl", "fcl"):
         service = Service(raw.service)

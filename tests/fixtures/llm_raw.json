@@ -78,7 +78,13 @@
     "mode": "sea",
     "service": "fcl",
     "origin_country": "VN",
-    "destination_country": "GB"
+    "destination_country": "GB",
+    "containers": [
+      {
+        "container_type": "container",
+        "quantity": 1
+      }
+    ]
   },
   "I05": {
     "direction": "import",
