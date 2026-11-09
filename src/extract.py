@@ -17,7 +17,7 @@ from src.config import load_config
 from src.llm import LLMClient, get_llm
 from src.measures import cbm_from_cartons, suggest_service, to_cm, to_kg, weight_from_cartons
 from src.models import (
-    CartonLine, ContainerLine, Direction, Enquiry, Incoterm, Mode, RawEnquiry, Service,
+    CartonLine, ContainerLine, CustomerRole, Direction, Enquiry, Incoterm, Mode, RawEnquiry, Service,
 )
 from src.rates import RateBook, load_rate_book
 from src.zones import normalise_postcode
@@ -88,6 +88,37 @@ def normalise_incoterm(raw: str | None) -> tuple[Incoterm, str | None]:
     return Incoterm.UNKNOWN, f"Incoterm not recognised: {raw!r}"
 
 
+def _country(code: str | None) -> str | None:
+    code = (code or "").strip().upper()
+    if code == "UK":
+        code = "GB"
+    return code if len(code) == 2 and code.isalpha() else None
+
+
+def decide_direction(origin: str | None, destination: str | None, llm_direction: str,
+                     home: set[str]) -> tuple[Direction, str | None]:
+    """Python, not the LLM, decides direction from the countries. Returns (direction, note).
+
+    destination in UK/EU                 -> import
+    origin in UK/EU, destination outside -> export
+    neither end in UK/EU                 -> cross_trade
+    """
+    if destination:
+        if destination in home:
+            return Direction.IMPORT, None
+        if origin in home:
+            return Direction.EXPORT, None
+        if origin:
+            return Direction.CROSS_TRADE, None
+        return Direction.UNKNOWN, f"Destination {destination} is outside the UK/EU and origin is unknown"
+    # Destination unknown: only accept the LLM's label when the countries don't contradict it.
+    if llm_direction == "export" and origin in home:
+        return Direction.EXPORT, None
+    if llm_direction == "import" and origin not in home:
+        return Direction.IMPORT, "Destination country not stated; assumed UK/EU import"
+    return Direction.UNKNOWN, None
+
+
 def _enum(enum_cls, value, default):
     try:
         return enum_cls(value)
@@ -150,9 +181,7 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
     origin_port = rb.port_code(raw.origin_port_name)
     if raw.origin_port_name and not origin_port:
         notes.append(f"Origin port not recognised: {raw.origin_port_name!r}")
-    uk_port = rb.port_code(raw.uk_port_name)
-    if raw.uk_port_name and not uk_port:
-        special.append(f"unsupported UK port: {raw.uk_port_name}")
+    destination_port = rb.port_code(raw.destination_port_name)
 
     # Service
     if containers:
@@ -168,10 +197,37 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
     else:
         service = Service.UNKNOWN
 
-    # Postcode
-    postcode = normalise_postcode(raw.delivery_postcode)
-    if raw.delivery_postcode and not postcode:
-        notes.append(f"Delivery postcode not recognised: {raw.delivery_postcode!r}")
+    # Countries -> direction (Python decides, the LLM only suggests)
+    origin_country = _country(raw.origin_country) or (origin_port[:2] if origin_port else None)
+    destination_country = _country(raw.destination_country)
+    uk_postcode = normalise_postcode(raw.delivery_postcode)
+    if destination_country is None and raw.direction != "export" and destination_port:
+        destination_country = destination_port[:2]
+        notes.append(f"Destination country taken as {destination_country} from the arrival port")
+    elif destination_country is None and uk_postcode and " " in uk_postcode:
+        destination_country = "GB"
+        notes.append("Destination taken as GB from the UK postcode")
+    direction, dir_note = decide_direction(origin_country, destination_country, raw.direction,
+                                           set(cfg["home_countries"]))
+    if dir_note:
+        notes.append(dir_note)
+    if raw.direction not in ("unknown", direction.value) and direction is not Direction.UNKNOWN:
+        notes.append(f"Model said '{raw.direction}', countries say '{direction.value}': using '{direction.value}'")
+
+    # Arrival port: must be in the destination country; unknown names only matter for sea imports
+    if destination_port and destination_country and not destination_port.startswith(destination_country):
+        notes.append(f"Arrival port {destination_port} is outside the delivery country {destination_country}")
+    if (raw.destination_port_name and not destination_port and raw.mode == "sea"
+            and direction is Direction.IMPORT and not rb.port_code(raw.destination_port_name)):
+        special.append(f"unsupported arrival port: {raw.destination_port_name}")
+
+    # Postcode: UK format check for the UK, cleaned prefix for the EU, as written elsewhere
+    if destination_country in (None, "GB"):
+        postcode = uk_postcode
+        if raw.delivery_postcode and not postcode:
+            notes.append(f"Delivery postcode not recognised as a UK postcode: {raw.delivery_postcode!r}")
+    else:
+        postcode = raw.delivery_postcode.strip() if raw.delivery_postcode else None
 
     # DG
     un_number = None
@@ -183,14 +239,16 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
     return Enquiry(
         customer_name=raw.customer_name,
         contact_email=raw.contact_email,
-        direction=_enum(Direction, raw.direction, Direction.UNKNOWN),
+        customer_role=_enum(CustomerRole, raw.customer_role, CustomerRole.UNKNOWN),
+        direction=direction,
         mode=_enum(Mode, raw.mode, Mode.UNKNOWN),
         service=service,
-        origin_country=(raw.origin_country or "").upper()[:2] or None,
+        origin_country=origin_country,
         origin_place=raw.origin_place,
+        destination_country=destination_country,
         origin_port=origin_port,
         origin_port_name=raw.origin_port_name,
-        uk_port=uk_port,
+        destination_port=destination_port,
         containers=containers,
         cartons=cartons,
         total_volume_cbm=volume,
@@ -204,6 +262,7 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
         incoterm_place=raw.incoterm_place,
         delivery_required=raw.delivery_required,
         delivery_postcode=postcode,
+        delivery_place=raw.delivery_place,
         ready_date=raw.ready_date,
         extraction_notes=notes,
     )
@@ -212,22 +271,36 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
 # ---------- 3. Safe defaults from the rate sheet ----------
 
 def apply_defaults(enquiry: Enquiry, rate_book: RateBook | None = None) -> Enquiry:
-    """Fill the UK port when the email doesn't name one and the rate sheet makes the choice clear."""
+    """Fill the arrival port when the email doesn't name one, and say so.
+
+    EU country: its default port from eu_country_ports.csv (staff confirm the routing).
+    UK: config default_uk_port if the lane exists, else the only UK port with a rate.
+    """
     rb = rate_book or load_rate_book()
     cfg = load_config()
     e = enquiry.model_copy(deep=True)
-    if (e.uk_port is None and e.origin_port and e.service is not Service.UNKNOWN
-            and e.direction is Direction.IMPORT and e.mode is Mode.SEA):
+    if e.destination_port is not None or e.direction is not Direction.IMPORT or e.mode is not Mode.SEA:
+        return e
+    if e.destination_country and e.destination_country != "GB":
+        port, note = rb.default_port_for_country(e.destination_country)
+        if port:
+            e.destination_port = port
+            e.extraction_notes.append(f"Arrival port not stated; default for {e.destination_country} is {port}"
+                                      + (f" ({note})" if note else "") + ": staff to confirm routing")
+        return e
+    if e.origin_port and e.service is not Service.UNKNOWN:
         types = [c.container_type for c in e.containers]
-        options = rb.destinations_for(e.origin_port, e.service, types)
+        options = rb.destinations_for(e.origin_port, e.service, types, country="GB")
         choice = None
         if cfg["default_uk_port"] in options:
             choice = cfg["default_uk_port"]
         elif len(options) == 1:
             choice = options[0]
         if choice:
-            e.uk_port = choice
+            e.destination_port = choice
             e.extraction_notes.append(f"UK port not stated; assumed {choice}")
+            if e.destination_country is None:
+                e.destination_country = "GB"
     return e
 
 

@@ -18,8 +18,37 @@ def test_port_code_aliases():
     assert rb.port_code(None) is None
 
 
-def test_uk_ports():
-    assert load_rate_book().uk_ports() == {"GBFXT", "GBSOU", "GBLGP"}
+def test_destination_ports():
+    rb = load_rate_book()
+    assert rb.uk_destination_ports() == {"GBFXT", "GBSOU", "GBLGP"}
+    assert {"NLRTM", "DEHAM", "FRLEH", "BEANR"} <= rb.eu_destination_ports()
+    assert rb.destination_ports() == rb.uk_destination_ports() | rb.eu_destination_ports()
+
+
+def test_priced_countries_cover_uk_and_eu27():
+    assert len(load_rate_book().priced_countries()) == 28
+
+
+def test_default_port_for_country():
+    rb = load_rate_book()
+    assert rb.default_port_for_country("FR")[0] == "FRLEH"
+    assert rb.default_port_for_country("AT")[0] == "DEHAM"
+    assert rb.default_port_for_country("GB") == (None, "")
+
+
+def test_every_eu_default_port_has_ocean_rates_and_delivery():
+    rb = load_rate_book()
+    for _, row in rb.eu_country_ports.iterrows():
+        port = row["default_port"]
+        assert port in rb.eu_destination_ports(), port
+        assert rb.has_lane("CNSHA", port, Service.LCL) and rb.has_lane("CNNGB", port, Service.FCL, ["40HC"])
+        assert rb.has_eu_delivery(port, row["country"], "1", Service.FCL), row["country"]
+
+
+def test_port_alias_eu():
+    rb = load_rate_book()
+    assert rb.port_code("Rotterdam") == "NLRTM" and rb.port_code("Göteborg") == "SEGOT"
+    assert rb.port_code("Bremerhaven") == "DEBRV"   # known, but not priced
 
 
 def test_has_lane():
@@ -36,3 +65,4 @@ def test_destinations_for():
     rb = load_rate_book()
     assert rb.destinations_for("CNSHA", Service.LCL) == ["GBFXT"]
     assert rb.destinations_for("CNSHA", Service.FCL, ["40HC"]) == ["GBFXT", "GBSOU"]
+    assert "DEHAM" in rb.destinations_for("CNSHA", Service.LCL, country="DE")

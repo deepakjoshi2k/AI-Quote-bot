@@ -14,10 +14,10 @@ import re
 from src.config import load_config
 from src.incoterms import charge_sections
 from src.models import (
-    ChargeSections, Direction, Enquiry, Incoterm, Mode, Service, Triage, TriageFlag,
+    ChargeSections, CustomerRole, Direction, Enquiry, Incoterm, Mode, Service, Triage, TriageFlag,
 )
 from src.rates import RateBook, load_rate_book
-from src.zones import MANUAL, normalise_postcode, zone_for_postcode
+from src.zones import MANUAL, zone_for_address
 
 
 def _matches(patterns: list[str], text: str) -> list[str]:
@@ -28,13 +28,13 @@ def _needs_origin_port(s: ChargeSections) -> bool:
     return s.ocean_freight or s.origin_pickup or s.origin_handling or s.origin_export_clearance
 
 
-def _needs_uk_port(s: ChargeSections) -> bool:
-    return s.ocean_freight or s.uk_destination or s.uk_delivery
+def _needs_destination_port(s: ChargeSections) -> bool:
+    return s.ocean_freight or s.destination_handling or s.delivery
 
 
 def _needs_cargo_size(s: ChargeSections) -> bool:
     # Customs-only (DAP) quotes are per entry, so cargo size isn't needed to price them.
-    return _needs_origin_port(s) or s.uk_destination or s.uk_delivery
+    return _needs_origin_port(s) or s.destination_handling or s.delivery
 
 
 def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cfg: dict
@@ -50,18 +50,43 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
             flags.append(flag)
         reasons.append(reason)
 
+    # 1. Routing: is this enquiry for another team? (v1 prices UK sea imports only)
     if e.direction is Direction.EXPORT:
-        block(TriageFlag.EXPORT, "Export enquiry: this agent handles UK imports only. Route to the export team.")
+        block(TriageFlag.EXPORT, "Export enquiry (goods leaving the UK/EU): route to the export team.")
+    elif e.direction is Direction.CROSS_TRADE:
+        block(TriageFlag.CROSS_TRADE, f"Cross-trade ({e.origin_country} → {e.destination_country}): "
+                                      "neither end is in the UK/EU. Route to the overseas/partner desk.")
+    elif (e.direction is Direction.IMPORT and e.destination_country
+          and e.destination_country not in rb.priced_countries()):
+        place = e.delivery_place or e.destination_country
+        block(TriageFlag.DESTINATION_NOT_PRICED,
+              f"Import into {e.destination_country} ({place}): no destination rates for this country. "
+              "Route to the European desk for destination port, customs and delivery charges.")
     if e.mode in (Mode.AIR, Mode.ROAD):
-        block(TriageFlag.NOT_SEA, f"{e.mode.value.title()} freight enquiry: this agent covers sea imports only. "
+        block(TriageFlag.NOT_SEA, f"{e.mode.value.title()} freight enquiry: this agent covers sea freight only. "
                                   f"Route to the {e.mode.value} team.")
+    routed_elsewhere = bool(reasons)
 
+    # 2. Dangerous goods matter to every team, so always check.
     cargo_text = " ".join(filter(None, [e.commodity, *e.special_requirements]))
     dg_hits = _matches(tcfg["dg_patterns"], cargo_text)
     if e.hazardous or e.un_number or dg_hits:
         detail = e.un_number or (e.commodity or "hazardous cargo")
         block(TriageFlag.DANGEROUS_GOODS,
               f"Dangerous goods ({detail}): needs DG-qualified staff, IMDG booking and a Safety Data Sheet (SDS).")
+
+    # 3. Who is asking? Useful context for whichever team gets it.
+    if e.customer_role in (CustomerRole.SELLER, CustomerRole.AGENT):
+        role_note = (f"Enquirer appears to be the {e.customer_role.value}, not the importer: "
+                     "the Incoterm split is the other way round for them.")
+        if routed_elsewhere:
+            info.append(role_note)
+        else:
+            block(TriageFlag.CUSTOMER_NOT_BUYER, role_note + " v1 only auto-quotes importers. Quote manually.")
+
+    # The remaining checks are about pricing a UK sea import; skip them if it's going elsewhere.
+    if routed_elsewhere:
+        return reasons, flags, info
 
     for item in e.special_requirements:
         if _matches(tcfg["special_patterns"], item):
@@ -70,21 +95,22 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
         block(TriageFlag.SPECIAL_CARGO, f"Special cargo: {e.commodity}.")
 
     if e.incoterm is Incoterm.DDP:
-        block(TriageFlag.DDP, "DDP: the supplier pays all costs including UK duty, so there is nothing to quote "
+        block(TriageFlag.DDP, "DDP: the supplier pays all costs including import duty, so there is nothing to quote "
                               "to the importer. Check whether the supplier wants a quote instead.")
 
     if e.delivery_postcode and e.delivery_required is not False:
-        pc = normalise_postcode(e.delivery_postcode)
-        if pc and zone_for_postcode(pc) == MANUAL:
+        if zone_for_address(e.destination_country, e.delivery_postcode) == MANUAL:
+            where = ("Northern Ireland / Highlands & Islands / IoM / Channel Islands"
+                     if e.destination_country in (None, "GB") else "an island / outermost region")
             block(TriageFlag.MANUAL_DELIVERY_AREA,
-                  f"Delivery to {pc} (Northern Ireland / Highlands & Islands / IoM / Channel Islands) needs a manual quote.")
+                  f"Delivery to {e.delivery_postcode} ({where}) needs a manual quote.")
 
     heavy = cfg["fcl"]["heavy_20gp_kg"]
     n20 = sum(c.quantity for c in e.containers if c.container_type == "20GP")
     n_all = sum(c.quantity for c in e.containers)
     if n20 and e.total_gross_weight_kg and e.total_gross_weight_kg / n_all > heavy:
         block(TriageFlag.HEAVY_CONTAINER,
-              f"Heavy 20GP (~{e.total_gross_weight_kg / n_all:,.0f} kg per container): check UK haulage weight limits.")
+              f"Heavy 20GP (~{e.total_gross_weight_kg / n_all:,.0f} kg per container): check road weight limits for delivery.")
 
     # Lane checks only make sense once we know which legs the importer pays for.
     if sections is not None and e.mode is not Mode.AIR and e.direction is not Direction.EXPORT:
@@ -96,21 +122,35 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
             elif e.origin_port and e.origin_port not in rb.origin_ports():
                 block(TriageFlag.LANE_NOT_IN_SHEET,
                       f"No rates from {e.origin_port} in the rate sheet: request a partner rate.")
-            elif (e.origin_port and e.uk_port and e.service is not Service.UNKNOWN
+            elif (e.origin_port and e.destination_port and e.service is not Service.UNKNOWN
                   and (e.service is Service.LCL or types)
                   and sections.ocean_freight
-                  and not rb.has_lane(e.origin_port, e.uk_port, e.service, types)):
+                  and not rb.has_lane(e.origin_port, e.destination_port, e.service, types)):
                 what = "LCL" if e.service is Service.LCL else "/".join(types)
                 block(TriageFlag.LANE_NOT_IN_SHEET,
-                      f"No {what} rate for {e.origin_port} → {e.uk_port} in the rate sheet: request a partner rate.")
+                      f"No {what} rate for {e.origin_port} → {e.destination_port} in the rate sheet: request a partner rate.")
             if (e.origin_port in rb.origin_ports() and e.service is not Service.UNKNOWN
                     and (sections.origin_pickup or sections.origin_handling)
                     and not rb.has_origin_charges(e.origin_port, e.service)):
                 block(TriageFlag.LANE_NOT_IN_SHEET,
                       f"No origin charges for {e.origin_port} ({e.service.value.upper()}): request partner origin rates.")
-        if _needs_uk_port(sections) and e.uk_port and e.uk_port not in rb.uk_ports():
-            block(TriageFlag.UK_PORT_NOT_IN_SHEET,
-                  f"UK port {e.uk_port} is not in our rate sheet (we price {', '.join(sorted(rb.uk_ports()))}).")
+        if _needs_destination_port(sections) and e.destination_port and e.destination_port not in rb.destination_ports():
+            block(TriageFlag.DESTINATION_PORT_NOT_IN_SHEET,
+                  f"Arrival port {e.destination_port} is not in our rate sheet: request partner destination rates.")
+        # EU delivery is priced from a given port to a given country/zone; check that rate exists.
+        if (sections.delivery and e.destination_country not in (None, "GB") and e.destination_port
+                and e.service is not Service.UNKNOWN and e.delivery_postcode):
+            zone = zone_for_address(e.destination_country, e.delivery_postcode)
+            if zone and zone != MANUAL and not rb.has_eu_delivery(e.destination_port, e.destination_country,
+                                                                    zone, e.service):
+                default, _ = rb.default_port_for_country(e.destination_country)
+                block(TriageFlag.LANE_NOT_IN_SHEET,
+                      f"No delivery rate from {e.destination_port} to {e.destination_country} zone {zone} "
+                      f"(our default port for {e.destination_country} is {default}): quote manually.")
+
+    if e.direction is Direction.IMPORT and e.destination_country not in (None, "GB"):
+        info.append(f"EU import ({e.destination_country}): customs via an EU customs partner; the importer "
+                    "needs an EU EORI number. Duties and import VAT at cost. Confirm process with Lincoln Cargo.")
 
     if e.commodity and _matches(tcfg["port_health_patterns"], e.commodity):
         flags.append(TriageFlag.PORT_HEALTH)
@@ -125,7 +165,7 @@ def _missing_fields(e: Enquiry, sections: ChargeSections | None, cfg: dict) -> t
     opt: list[str] = []
 
     if e.direction is Direction.UNKNOWN:
-        req.append("direction (import into the UK or export)")
+        req.append("where the goods are coming from and going to (countries)")
     if e.mode is Mode.UNKNOWN:
         req.append("transport mode (sea, air or road)")
     if e.incoterm is Incoterm.UNKNOWN:
@@ -153,15 +193,15 @@ def _missing_fields(e: Enquiry, sections: ChargeSections | None, cfg: dict) -> t
             req.append("origin port or supplier's city")
     if sections is not None and (sections.origin_pickup and not e.origin_place):
         opt.append("supplier's collection address")
-    if sections is not None and _needs_uk_port(sections) and e.uk_port is None:
-        req.append("UK port of arrival")
+    if sections is not None and _needs_destination_port(sections) and e.destination_port is None:
+        req.append("port of arrival")
 
     delivery_possible = sections is None or e.incoterm not in (Incoterm.DAP, Incoterm.DDP)
     if delivery_possible:
         if e.delivery_required is True and not e.delivery_postcode:
-            req.append("UK delivery postcode")
+            req.append("delivery postcode")
         elif e.delivery_required is None:
-            opt.append("UK delivery needed? If so, the delivery postcode")
+            opt.append("delivery needed? If so, the delivery postcode")
 
     if e.ready_date is None:
         opt.append("cargo ready date")

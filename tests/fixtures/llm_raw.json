@@ -8,7 +8,7 @@
     "origin_country": "CN",
     "origin_place": "Ningbo",
     "origin_port_name": "Ningbo",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "40ft high cube",
@@ -21,7 +21,9 @@
     "incoterm_place": "Ningbo",
     "delivery_required": true,
     "delivery_postcode": "SL1 4QP",
-    "ready_date": "2026-11-20"
+    "ready_date": "2026-11-20",
+    "destination_country": "GB",
+    "customer_role": "buyer"
   },
   "I02": {
     "customer_name": "Ahmed Khan",
@@ -42,7 +44,9 @@
     "delivery_postcode": "SL3 0HJ",
     "notes": [
       "Port of loading assumed Shanghai from supplier location"
-    ]
+    ],
+    "destination_country": "GB",
+    "customer_role": "buyer"
   },
   "I03": {
     "customer_name": "Tom Reed",
@@ -52,7 +56,7 @@
     "service": "fcl",
     "origin_country": "IN",
     "origin_port_name": "Nhava Sheva",
-    "uk_port_name": "London Gateway",
+    "destination_port_name": "London Gateway",
     "containers": [
       {
         "container_type": "20ft",
@@ -64,14 +68,17 @@
     "commodity": "machine spare parts",
     "incoterm": "CIF",
     "delivery_required": true,
-    "delivery_postcode": "LE4 9HA"
+    "delivery_postcode": "LE4 9HA",
+    "destination_country": "GB",
+    "customer_role": "buyer"
   },
   "I04": {
     "customer_name": "Mark",
     "direction": "import",
     "mode": "sea",
     "service": "fcl",
-    "origin_country": "VN"
+    "origin_country": "VN",
+    "destination_country": "GB"
   },
   "I05": {
     "direction": "import",
@@ -88,7 +95,8 @@
     "un_number": "UN3480",
     "incoterm": "FOB",
     "delivery_required": true,
-    "delivery_postcode": "RG2 0QX"
+    "delivery_postcode": "RG2 0QX",
+    "destination_country": "GB"
   },
   "I06": {
     "direction": "import",
@@ -96,7 +104,7 @@
     "service": "fcl",
     "origin_country": "BR",
     "origin_port_name": "Santos",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "20ft",
@@ -107,7 +115,8 @@
     "incoterm": "FOB",
     "incoterm_place": "Santos",
     "delivery_required": true,
-    "delivery_postcode": "BS2 0XS"
+    "delivery_postcode": "BS2 0XS",
+    "destination_country": "GB"
   },
   "I07": {
     "customer_name": "Lucy Grant",
@@ -115,7 +124,7 @@
     "direction": "import",
     "mode": "sea",
     "service": "fcl",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "40HC",
@@ -126,7 +135,9 @@
     "incoterm": "DAP",
     "incoterm_place": "Milton Keynes warehouse",
     "delivery_required": false,
-    "delivery_postcode": "MK1 1AA"
+    "delivery_postcode": "MK1 1AA",
+    "destination_country": "GB",
+    "customer_role": "buyer"
   },
   "I08": {
     "direction": "import",
@@ -138,7 +149,9 @@
     "weight_unit": "kg",
     "commodity": "textile samples",
     "incoterm": "DAP",
-    "incoterm_place": "Heathrow"
+    "incoterm_place": "Heathrow",
+    "destination_country": "GB",
+    "destination_port_name": "Heathrow"
   },
   "I09": {
     "direction": "export",
@@ -146,7 +159,7 @@
     "service": "fcl",
     "origin_country": "GB",
     "origin_place": "Birmingham",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "20ft",
@@ -154,7 +167,9 @@
       }
     ],
     "incoterm": "FOB",
-    "incoterm_place": "Felixstowe"
+    "incoterm_place": "Felixstowe",
+    "destination_country": "AE",
+    "customer_role": "seller"
   },
   "I10": {
     "customer_name": "Nina Patel",
@@ -164,7 +179,7 @@
     "service": "lcl",
     "origin_country": "VN",
     "origin_port_name": "Ho Chi Minh City",
-    "uk_port_name": "Southampton",
+    "destination_port_name": "Southampton",
     "total_volume_cbm": 0.6,
     "total_weight": 210,
     "weight_unit": "kg",
@@ -173,7 +188,9 @@
     "incoterm": "FOB",
     "incoterm_place": "Ho Chi Minh City",
     "delivery_required": true,
-    "delivery_postcode": "RG2 0QX"
+    "delivery_postcode": "RG2 0QX",
+    "destination_country": "GB",
+    "customer_role": "buyer"
   },
   "I11": {
     "customer_name": "Daniel Okafor",
@@ -183,7 +200,7 @@
     "service": "lcl",
     "origin_country": "IN",
     "origin_port_name": "Nhava Sheva",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "cartons": [
       {
         "quantity": 40,
@@ -200,6 +217,32 @@
     "incoterm": "FOB",
     "incoterm_place": "Nhava Sheva",
     "delivery_required": true,
-    "delivery_postcode": "B6 7JH"
+    "delivery_postcode": "B6 7JH",
+    "destination_country": "GB",
+    "customer_role": "buyer"
+  },
+  "I12": {
+    "customer_role": "agent",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "destination_country": "FR",
+    "containers": [
+      {
+        "container_type": "20' GP",
+        "quantity": 1
+      }
+    ],
+    "total_weight": 21,
+    "weight_unit": "t",
+    "commodity": "Industrial parts / engineering goods",
+    "incoterm": "DAP",
+    "incoterm_place": "Example Components SAS, 12 Rue de l'Usine, 51300 Vitry-le-François, France",
+    "delivery_required": true,
+    "delivery_postcode": "51300",
+    "delivery_place": "Vitry-le-François, France",
+    "notes": [
+      "Customer asks for the nearest POD to the delivery address"
+    ]
   }
 }

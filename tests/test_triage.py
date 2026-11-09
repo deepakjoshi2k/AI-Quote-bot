@@ -3,7 +3,7 @@ import pytest
 from src.extract import apply_defaults, extract_enquiry, normalise
 from src.models import ContainerLine, Enquiry, Incoterm, RawEnquiry, Service, TriageFlag
 from src.triage import triage
-from src.zones import zone_for_postcode
+from src.zones import zone_for_address
 from tests.conftest import SAMPLE_IDS, sample_text
 
 
@@ -18,8 +18,9 @@ def test_sample_enquiry(sid, fake_llm, expected):
     assert t.status == exp["status"], t.reasons + t.missing_fields
     assert sorted(f.value for f in t.flags) == sorted(exp["flags"])
 
-    for field in ["direction", "mode", "service", "origin_port", "uk_port", "incoterm", "un_number",
-                  "delivery_required", "delivery_postcode", "pallets", "hazardous", "origin_country"]:
+    for field in ["direction", "mode", "service", "origin_port", "destination_port", "incoterm", "un_number",
+                  "delivery_required", "delivery_postcode", "pallets", "hazardous", "origin_country",
+                  "destination_country"]:
         if field in exp:
             value = getattr(e, field)
             assert (value.value if hasattr(value, "value") else value) == exp[field], field
@@ -31,7 +32,7 @@ def test_sample_enquiry(sid, fake_llm, expected):
     if "ready_date" in exp:
         assert e.ready_date.isoformat() == exp["ready_date"]
     if "zone" in exp:
-        assert zone_for_postcode(e.delivery_postcode) == exp["zone"]
+        assert zone_for_address(e.destination_country, e.delivery_postcode) == exp["zone"]
     for phrase in exp.get("missing_contains", []):
         assert any(phrase.lower() in m.lower() for m in t.missing_fields), f"missing '{phrase}' in {t.missing_fields}"
 
@@ -56,7 +57,7 @@ def test_lane_reason_names_lane(fake_llm):
 
 def _quotable(**overrides) -> Enquiry:
     """An LCL FOB Shanghai -> Felixstowe enquiry that triages to 'quote'."""
-    base = dict(direction="import", mode="sea", service=Service.LCL, origin_port="CNSHA", uk_port="GBFXT",
+    base = dict(direction="import", mode="sea", service=Service.LCL, origin_port="CNSHA", destination_port="GBFXT",
                 total_volume_cbm=2.0, total_gross_weight_kg=500, commodity="toys", hazardous=False,
                 incoterm=Incoterm.FOB, delivery_required=True, delivery_postcode="SL1 4QP",
                 ready_date="2026-12-01")
@@ -107,9 +108,9 @@ def test_container_type_not_in_sheet():
     assert t.status == "manual_review" and TriageFlag.LANE_NOT_IN_SHEET in t.flags
 
 
-def test_uk_port_not_in_sheet():
-    t = triage(_quotable(uk_port="GBLIV"))
-    assert TriageFlag.UK_PORT_NOT_IN_SHEET in t.flags
+def test_destination_port_not_in_sheet():
+    t = triage(_quotable(destination_port="GBLIV"))
+    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in t.flags
 
 
 def test_unsupported_incoterm_goes_manual():
@@ -135,7 +136,7 @@ def test_missing_incoterm_asks():
 
 def test_delivery_requested_without_postcode():
     t = triage(_quotable(delivery_postcode=None))
-    assert t.status == "need_info" and "UK delivery postcode" in t.missing_fields
+    assert t.status == "need_info" and "delivery postcode" in t.missing_fields
 
 
 def test_optional_fields_dont_block_quote():
@@ -143,6 +144,96 @@ def test_optional_fields_dont_block_quote():
 
 
 def test_dap_customs_only_needs_no_cargo_size():
-    e = _quotable(incoterm=Incoterm.DAP, total_volume_cbm=None, total_gross_weight_kg=None, uk_port=None,
+    e = _quotable(incoterm=Incoterm.DAP, total_volume_cbm=None, total_gross_weight_kg=None, destination_port=None,
                   origin_port=None, service=Service.UNKNOWN)
     assert triage(e).status == "quote"
+
+
+# ---------- Phase 3.1: direction from countries, routing, customer role ----------
+
+def test_air_enquiry_only_routes_to_air_team(fake_llm):
+    t = triage(extract_enquiry(sample_text("I08"), llm=fake_llm))
+    assert t.flags == [TriageFlag.NOT_SEA]   # no noise about Heathrow not being a sea port
+
+
+def test_air_dg_still_flagged():
+    e = _quotable(mode="air", commodity="lithium batteries")
+    assert set(triage(e).flags) == {TriageFlag.NOT_SEA, TriageFlag.DANGEROUS_GOODS}
+
+
+def test_i12_agent_asking_for_eu_dap_is_manual(fake_llm):
+    t = triage(extract_enquiry(sample_text("I12"), llm=fake_llm))
+    assert TriageFlag.CUSTOMER_NOT_BUYER in t.flags
+    assert any("agent" in r for r in t.reasons)
+
+
+# ---------- EU destinations ----------
+
+def _eu(**overrides) -> Enquiry:
+    """LCL FOB Shanghai -> Hamburg, delivered in Germany: should be quotable."""
+    base = dict(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095")
+    base.update(overrides)
+    return _quotable(**base)
+
+
+def test_eu_import_quotable():
+    t = triage(_eu())
+    assert t.status == "quote", t.reasons
+    assert any("EU EORI" in r for r in t.reasons)
+
+
+def test_eu_default_port_filled():
+    raw = RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai",
+                     destination_country="FR", delivery_postcode="51300", total_volume_cbm=2, total_weight=400,
+                     commodity="toys", incoterm="FOB", delivery_required=True, hazardous=False, customer_role="buyer")
+    e = apply_defaults(normalise(raw))
+    assert e.destination_port == "FRLEH"
+    assert any("staff to confirm" in n for n in e.extraction_notes)
+    assert triage(e).status == "quote"
+
+
+def test_eu_island_is_manual():
+    t = triage(_eu(destination_country="FR", destination_port="FRLEH", delivery_postcode="20000"))
+    assert TriageFlag.MANUAL_DELIVERY_AREA in t.flags
+
+
+def test_eu_port_without_delivery_rate_to_country():
+    t = triage(_eu(destination_port="NLRTM"))   # Rotterdam -> Germany delivery not in the sheet
+    assert t.status == "manual_review" and TriageFlag.LANE_NOT_IN_SHEET in t.flags
+
+
+def test_eu_port_not_priced():
+    t = triage(_eu(destination_port="DEBRV"))
+    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in t.flags
+
+
+def test_eu_missing_postcode_asks():
+    t = triage(_eu(delivery_postcode=None))
+    assert t.status == "need_info" and "delivery postcode" in t.missing_fields
+
+
+def test_eu_port_name_sets_country():
+    e = normalise(RawEnquiry(direction="import", mode="sea", destination_port_name="Rotterdam"))
+    assert e.destination_country == "NL" and e.destination_port == "NLRTM"
+
+
+def test_home_country_without_rates_routed(monkeypatch):
+    from src.config import load_config
+    cfg = dict(load_config()); cfg["home_countries"] = cfg["home_countries"] + ["NO"]
+    monkeypatch.setattr("src.triage.load_config", lambda: cfg)
+    t = triage(_quotable(destination_country="NO", delivery_postcode="0150"))
+    assert t.flags == [TriageFlag.DESTINATION_NOT_PRICED]
+
+
+def test_seller_asking_is_manual():
+    t = triage(_quotable(customer_role="seller"))
+    assert t.status == "manual_review" and TriageFlag.CUSTOMER_NOT_BUYER in t.flags
+
+
+def test_unknown_role_treated_as_importer():
+    assert triage(_quotable(customer_role="unknown")).status == "quote"
+
+
+def test_cross_trade_routed():
+    e = _quotable(direction="cross_trade", origin_country="CN", destination_country="US")
+    assert triage(e).flags == [TriageFlag.CROSS_TRADE]

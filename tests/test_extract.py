@@ -3,11 +3,11 @@ import json
 import pytest
 
 from src.extract import (
-    apply_defaults, build_system_prompt, extract_enquiry, normalise, normalise_container_type,
-    normalise_incoterm,
+    apply_defaults, build_system_prompt, decide_direction, extract_enquiry, normalise,
+    normalise_container_type, normalise_incoterm,
 )
 from src.llm import LLMError, OpenAICompatibleLLM, LLMSettings, parse_json_text
-from src.models import Incoterm, RawEnquiry, Service
+from src.models import Direction, Incoterm, RawEnquiry, Service
 from tests.conftest import sample_text
 
 
@@ -94,8 +94,8 @@ def test_unsupported_container_goes_to_special():
 # ---------- ports, postcode, UN ----------
 
 def test_ports_mapped():
-    e = normalise(RawEnquiry(origin_port_name="Nhava Sheva", uk_port_name="London Gateway"))
-    assert (e.origin_port, e.uk_port) == ("INNSA", "GBLGP")
+    e = normalise(RawEnquiry(origin_port_name="Nhava Sheva", destination_port_name="London Gateway"))
+    assert (e.origin_port, e.destination_port) == ("INNSA", "GBLGP")
 
 
 def test_unknown_origin_port_kept_as_name():
@@ -103,9 +103,9 @@ def test_unknown_origin_port_kept_as_name():
     assert e.origin_port is None and e.origin_port_name == "Atlantis"
 
 
-def test_unknown_uk_port_flagged():
-    e = normalise(RawEnquiry(uk_port_name="Hull docks"))
-    assert e.uk_port is None and any("unsupported UK port" in s for s in e.special_requirements)
+def test_unknown_arrival_port_flagged():
+    e = normalise(RawEnquiry(destination_port_name="Hull docks", direction="import", mode="sea", destination_country="GB"))
+    assert e.destination_port is None and any("unsupported arrival port" in s for s in e.special_requirements)
 
 
 def test_postcode_normalised():
@@ -126,13 +126,13 @@ def test_un_number_sets_hazardous():
 
 def test_default_uk_port_filled_and_noted():
     e = apply_defaults(normalise(RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai")))
-    assert e.uk_port == "GBFXT"
+    assert e.destination_port == "GBFXT"
     assert any("UK port not stated" in n for n in e.extraction_notes)
 
 
 def test_default_not_applied_when_no_lane():
     e = apply_defaults(normalise(RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Santos")))
-    assert e.uk_port is None
+    assert e.destination_port is None
 
 
 # ---------- prompt + LLM plumbing ----------
@@ -199,3 +199,54 @@ def test_settings_ollama_needs_no_key(monkeypatch):
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
     s = LLMSettings.from_env()
     assert s.base_url.startswith("http://localhost:11434") and s.model == "llama3.1"
+
+
+# ---------- direction decided by Python from the countries ----------
+
+HOME = {"GB", "FR", "NL", "DE"}
+
+
+@pytest.mark.parametrize("origin, dest, llm, expected", [
+    ("CN", "GB", "import", Direction.IMPORT),
+    (None, "FR", "export", Direction.IMPORT),        # the France DAP email: destination in EU = import
+    ("NL", "FR", "unknown", Direction.IMPORT),       # intra-EU
+    ("GB", "AE", "import", Direction.EXPORT),        # model wrong, countries win
+    ("CN", "US", "import", Direction.CROSS_TRADE),
+    (None, "US", "import", Direction.UNKNOWN),
+    ("GB", None, "export", Direction.EXPORT),
+    ("VN", None, "import", Direction.IMPORT),
+    ("GB", None, "import", Direction.UNKNOWN),       # contradicts: ask
+    (None, None, "unknown", Direction.UNKNOWN),
+])
+def test_decide_direction(origin, dest, llm, expected):
+    assert decide_direction(origin, dest, llm, HOME)[0] is expected
+
+
+def test_uk_postcode_implies_gb():
+    e = normalise(RawEnquiry(direction="import", delivery_postcode="SL1 4QP"))
+    assert e.destination_country == "GB"
+
+
+def test_foreign_postcode_kept_as_written():
+    e = normalise(RawEnquiry(destination_country="FR", delivery_postcode="51300"))
+    assert e.delivery_postcode == "51300"
+    assert not any("not recognised" in n for n in e.extraction_notes)
+
+
+def test_model_cannot_invent_uk_origin_for_eu_import():
+    # The real failure: model said export + origin GB for a France delivery with no origin stated.
+    e = normalise(RawEnquiry(direction="export", destination_country="FR"))
+    assert e.direction is Direction.IMPORT
+
+
+def test_origin_country_from_port():
+    assert normalise(RawEnquiry(origin_port_name="Ningbo")).origin_country == "CN"
+
+
+def test_uk_alias_normalised():
+    assert normalise(RawEnquiry(destination_country="UK")).destination_country == "GB"
+
+
+def test_export_port_not_taken_as_destination():
+    e = normalise(RawEnquiry(direction="export", origin_country="GB", destination_port_name="Felixstowe"))
+    assert e.destination_country is None and e.direction is Direction.EXPORT

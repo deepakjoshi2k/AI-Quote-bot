@@ -13,7 +13,7 @@ def test_enquiry_defaults():
 def test_enquiry_parses_llm_style_json():
     e = Enquiry.model_validate({
         "direction": "import", "mode": "sea", "service": "fcl",
-        "origin_port": "CNNGB", "uk_port": "GBFXT",
+        "origin_port": "CNNGB", "destination_port": "GBFXT",
         "containers": [{"container_type": "40HC", "quantity": 1}],
         "incoterm": "FOB", "delivery_required": True,
         "delivery_postcode": "SL1 4QP", "ready_date": "2026-11-20",

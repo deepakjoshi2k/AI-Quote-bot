@@ -1,6 +1,6 @@
 import pytest
 
-from src.zones import normalise_postcode, postcode_area, zone_for_postcode
+from src.zones import clean_eu_postcode, eu_zone, normalise_postcode, postcode_area, zone_for_address, zone_for_postcode
 
 
 @pytest.mark.parametrize("raw, expected", [
@@ -28,3 +28,26 @@ def test_postcode_area_invalid():
 ])
 def test_zone_for_postcode(pc, zone):
     assert zone_for_postcode(pc) == zone
+
+
+@pytest.mark.parametrize("country, pc, zone", [
+    ("FR", "51300", "2"), ("FR", "76600", "1"), ("FR", "F-75008", "1"), ("FR", "20000", "MANUAL"),
+    ("NL", "3011 AB", "1"), ("DE", "20095", "1"), ("DE", "D-80331", "2"), ("ES", "35001", "MANUAL"),
+    ("ES", "46001", "1"), ("IT", "09100", "MANUAL"), ("PT", "9000-001", "MANUAL"), ("LV", "LV-1050", "1"),
+    ("XX", "123", None),
+])
+def test_eu_zone(country, pc, zone):
+    assert eu_zone(country, pc) == zone
+
+
+def test_clean_eu_postcode():
+    assert clean_eu_postcode("LV-1050", "LV") == "1050"
+    assert clean_eu_postcode("3011 ab", "NL") == "3011AB"
+    assert clean_eu_postcode(None, "FR") is None
+
+
+def test_zone_for_address_routes_uk_and_eu():
+    assert zone_for_address("GB", "SL1 4QP") == "1"
+    assert zone_for_address(None, "BT1 1AA") == "MANUAL"
+    assert zone_for_address("FR", "51300") == "2"
+    assert zone_for_address("GB", "not a postcode") is None

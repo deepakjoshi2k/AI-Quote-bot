@@ -8,7 +8,7 @@ from src.models import ChargeSections, Incoterm
 T, F = True, False
 FIELDS = [
     "origin_pickup", "origin_export_clearance", "origin_handling", "ocean_freight",
-    "uk_destination", "uk_import_clearance", "uk_delivery",
+    "destination_handling", "import_clearance", "delivery",
 ]
 
 # Expected sections WITH delivery requested (03_freight_domain_reference.md, section 4).
@@ -67,18 +67,18 @@ def test_ddp_has_nothing_to_quote():
 
 def test_sample_I01_fob_no_origin():
     s = charge_sections(Incoterm.FOB, True)
-    assert s.ocean_freight and s.uk_delivery and not s.origin_pickup
+    assert s.ocean_freight and s.delivery and not s.origin_pickup
 
 
 def test_sample_I03_cif_no_freight():
     s = charge_sections(Incoterm.CIF, True)
-    assert not s.ocean_freight and s.uk_destination
+    assert not s.ocean_freight and s.destination_handling
 
 
 def test_sample_I07_dap_clearance_only():
     s = charge_sections(Incoterm.DAP, True)
-    assert s.uk_import_clearance
-    assert not (s.ocean_freight or s.uk_destination or s.uk_delivery)
+    assert s.import_clearance
+    assert not (s.ocean_freight or s.destination_handling or s.delivery)
     assert delivery_ignored(Incoterm.DAP, True)
 
 
