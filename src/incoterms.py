@@ -7,8 +7,8 @@ from __future__ import annotations
 from src.models import ChargeSections, Incoterm
 
 # Columns: origin_pickup, origin_export_clearance, origin_handling, ocean_freight,
-#          uk_destination, uk_import_clearance, uk_delivery_allowed
-# uk_delivery_allowed = the importer *can* buy delivery from us; it is only charged if requested.
+#          destination_handling, import_clearance, delivery_allowed
+# delivery_allowed = the importer *can* buy delivery from us; it is only charged if requested.
 _TABLE: dict[Incoterm, tuple[bool, bool, bool, bool, bool, bool, bool]] = {
     Incoterm.EXW: (True,  True,  True,  True,  True,  True,  True),
     Incoterm.FCA: (True,  False, True,  True,  True,  True,  True),
@@ -47,9 +47,9 @@ def charge_sections(incoterm: Incoterm | str, delivery_required: bool | None) ->
         origin_export_clearance=exp_clr,
         origin_handling=handling,
         ocean_freight=freight,
-        uk_destination=dest,
-        uk_import_clearance=imp_clr,
-        uk_delivery=delivery_allowed and delivery_required is True,
+        destination_handling=dest,
+        import_clearance=imp_clr,
+        delivery=delivery_allowed and delivery_required is True,
     )
 
 

@@ -1,0 +1,28 @@
+country,name,default_port,note
+AT,Austria,DEHAM,
+BE,Belgium,BEANR,
+BG,Bulgaria,GRPIR,Constanta or Varna may be better: confirm
+HR,Croatia,SIKOP,
+CY,Cyprus,GRPIR,feeder Piraeus -> Limassol: confirm
+CZ,Czechia,DEHAM,
+DK,Denmark,DEHAM,
+EE,Estonia,PLGDN,
+FI,Finland,SEGOT,ferry to Finland: confirm routing
+FR,France,FRLEH,
+DE,Germany,DEHAM,
+GR,Greece,GRPIR,islands need a manual quote
+HU,Hungary,SIKOP,
+IE,Ireland,NLRTM,feeder / ro-ro to Ireland: confirm
+IT,Italy,ITGOA,
+LV,Latvia,PLGDN,
+LT,Lithuania,PLGDN,
+LU,Luxembourg,BEANR,
+MT,Malta,ITGOA,feeder Genoa -> Malta: confirm
+NL,Netherlands,NLRTM,
+PL,Poland,PLGDN,
+PT,Portugal,ESVLC,Sines/Lisbon may be better: confirm
+RO,Romania,GRPIR,Constanta may be better: confirm
+SK,Slovakia,DEHAM,
+SI,Slovenia,SIKOP,
+ES,Spain,ESVLC,
+SE,Sweden,SEGOT,

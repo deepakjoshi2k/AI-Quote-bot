@@ -24,4 +24,5 @@ pytest
 - [x] Phase 1 – schemas (`src/models.py`), measures (`src/measures.py`), config, rate sheets in `data/`
 - [x] Phase 2 – Incoterm logic (`src/incoterms.py`)
 - [x] Phase 3 – extraction (`llm.py`, `extract.py`, `triage.py`, `zones.py`, lane checks in `rates.py`)
+- [x] Phase 3.1 – direction from countries, customer role, UK **and EU-27** destinations (mock EU sheets via `scripts/make_eu_mock_data.py`)
 - [ ] Phase 4 – pricing (`zones.py`, `rates.py`, `quote.py`)

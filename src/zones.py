@@ -1,4 +1,8 @@
-"""UK postcode -> delivery zone ("1", "2", "3" or "MANUAL"), from data/uk_postcode_zones.csv."""
+"""Postcode -> delivery zone.
+
+UK: "1", "2", "3" or "MANUAL" from data/uk_postcode_zones.csv (by postcode area letters).
+EU: "1", "2" or "MANUAL" from data/eu_postcode_zones.csv (by country + postcode prefix).
+"""
 from __future__ import annotations
 
 import re
@@ -55,3 +59,50 @@ def _area_to_zone(path: Path = DATA_DIR / "uk_postcode_zones.csv") -> dict[str, 
 def zone_for_postcode(postcode: str) -> str:
     """Zone from the postcode area; areas not listed are zone '3' (rest of mainland GB)."""
     return _area_to_zone().get(postcode_area(postcode), "3")
+
+
+# ---------- EU ----------
+
+def clean_eu_postcode(raw: str | None, country: str) -> str | None:
+    """Uppercase, no spaces/hyphens, country prefix removed ('LV-1050' -> '1050', 'F-51300' -> '51300')."""
+    if not raw:
+        return None
+    s = re.sub(r"[\s\-]", "", raw.upper())
+    for prefix in (country, country[:1]):
+        if s.startswith(prefix) and len(s) > len(prefix) and s[len(prefix)].isdigit():
+            s = s[len(prefix):]
+            break
+    return s or None
+
+
+@lru_cache(maxsize=4)
+def _eu_zone_rules(path: Path = DATA_DIR / "eu_postcode_zones.csv") -> dict[str, list[tuple[str, str]]]:
+    """country -> [(prefix, zone)] sorted longest prefix first; '*' = default zone."""
+    df = pd.read_csv(path, dtype=str)
+    rules: dict[str, list[tuple[str, str]]] = {}
+    for _, row in df.iterrows():
+        for prefix in row["postcode_prefixes"].split(";"):
+            rules.setdefault(row["country"], []).append((prefix.strip().upper(), row["zone"].strip().upper()))
+    for country in rules:
+        rules[country].sort(key=lambda r: (r[0] == "*", -len(r[0])))
+    return rules
+
+
+def eu_zone(country: str, postcode: str | None) -> str | None:
+    """Zone for an EU delivery. None if the country isn't in the sheet."""
+    rules = _eu_zone_rules().get(country)
+    if not rules:
+        return None
+    pc = clean_eu_postcode(postcode, country) or ""
+    for prefix, zone in rules:
+        if prefix == "*" or (pc and pc.startswith(prefix)):
+            return zone
+    return None
+
+
+def zone_for_address(country: str | None, postcode: str | None) -> str | None:
+    """UK or EU zone for a delivery address. None when it can't be worked out."""
+    if country in (None, "GB"):
+        pc = normalise_postcode(postcode)
+        return zone_for_postcode(pc) if pc else None
+    return eu_zone(country, postcode)

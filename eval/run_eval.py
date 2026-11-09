@@ -20,11 +20,11 @@ from pathlib import Path
 from src.extract import extract_enquiry
 from src.llm import get_llm
 from src.triage import triage
-from src.zones import zone_for_postcode
+from src.zones import zone_for_address
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLES = ROOT / "data" / "sample_enquiries"
-SCALAR_FIELDS = ["direction", "mode", "service", "origin_port", "uk_port", "incoterm", "un_number",
+SCALAR_FIELDS = ["direction", "mode", "service", "origin_port", "destination_port", "incoterm", "un_number",
                  "delivery_required", "delivery_postcode", "pallets", "hazardous", "origin_country",
                  "destination_country"]
 NUMERIC_FIELDS = ["total_volume_cbm", "total_gross_weight_kg"]
@@ -57,7 +57,7 @@ def check(sid: str, exp: dict, llm) -> tuple[list[str], float]:
         errors.append(f"containers: {[c.model_dump() for c in e.containers]} != {exp['containers']}")
     if "ready_date" in exp and (e.ready_date is None or e.ready_date.isoformat() != exp["ready_date"]):
         errors.append(f"ready_date: {e.ready_date} != {exp['ready_date']}")
-    if "zone" in exp and (not e.delivery_postcode or zone_for_postcode(e.delivery_postcode) != exp["zone"]):
+    if "zone" in exp and zone_for_address(e.destination_country, e.delivery_postcode) != exp["zone"]:
         errors.append(f"zone for {e.delivery_postcode} != {exp['zone']}")
     for phrase in exp.get("missing_contains", []):
         if not any(phrase.lower() in m.lower() for m in t.missing_fields):

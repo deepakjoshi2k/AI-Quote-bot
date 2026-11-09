@@ -78,7 +78,7 @@ class Enquiry(BaseModel):
     destination_country: str | None = None # ISO 2-letter; GB for the UK
     origin_port: str | None = None         # UN/LOCODE e.g. CNSHA (only if recognised)
     origin_port_name: str | None = None    # port as written in the email, e.g. "Santos"
-    uk_port: str | None = None             # GBFXT / GBSOU / GBLGP
+    destination_port: str | None = None             # GBFXT / GBSOU / GBLGP
     containers: list[ContainerLine] = Field(default_factory=list)   # FCL
     cartons: list[CartonLine] = Field(default_factory=list)         # LCL detail
     total_volume_cbm: float | None = Field(default=None, ge=0)
@@ -101,14 +101,14 @@ class TriageFlag(str, Enum):
     """Machine-readable reasons, used by the pipeline to route the enquiry."""
     EXPORT = "export"
     CROSS_TRADE = "cross_trade"
-    NON_UK_DESTINATION = "non_uk_destination"   # e.g. EU delivery: no rates in v1
+    DESTINATION_NOT_PRICED = "destination_not_priced"   # e.g. EU delivery: no rates in v1
     CUSTOMER_NOT_BUYER = "customer_not_buyer"
     NOT_SEA = "not_sea"
     DANGEROUS_GOODS = "dangerous_goods"
     SPECIAL_CARGO = "special_cargo"
     DDP = "ddp"
     LANE_NOT_IN_SHEET = "lane_not_in_sheet"
-    UK_PORT_NOT_IN_SHEET = "uk_port_not_in_sheet"
+    DESTINATION_PORT_NOT_IN_SHEET = "destination_port_not_in_sheet"
     MANUAL_DELIVERY_AREA = "manual_delivery_area"
     HEAVY_CONTAINER = "heavy_container"
     PORT_HEALTH = "port_health"          # informational only, does not block a quote
@@ -127,9 +127,9 @@ class ChargeSections(BaseModel):
     origin_export_clearance: bool
     origin_handling: bool
     ocean_freight: bool
-    uk_destination: bool
-    uk_import_clearance: bool
-    uk_delivery: bool
+    destination_handling: bool
+    import_clearance: bool
+    delivery: bool
 
     def any(self) -> bool:
         """True if there is anything at all to quote."""
@@ -192,7 +192,7 @@ class RawEnquiry(BaseModel):
     origin_place: str | None = None
     destination_country: str | None = None # ISO 3166 alpha-2, "GB" for the UK
     origin_port_name: str | None = None
-    uk_port_name: str | None = None
+    destination_port_name: str | None = None
     containers: list[RawContainerLine] = Field(default_factory=list)
     cartons: list[RawCartonLine] = Field(default_factory=list)
     total_volume_cbm: float | None = None  # only if stated in CBM / m3

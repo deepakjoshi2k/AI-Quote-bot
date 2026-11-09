@@ -1,0 +1,43 @@
+country,zone,postcode_prefixes,description
+AT,1,*,whole country
+BE,1,*,whole country
+BG,1,*,whole country
+HR,1,51;52,near the default port / main area
+HR,2,*,rest of country
+CY,1,*,whole country
+CZ,1,*,whole country
+DK,1,6;7,near the default port / main area
+DK,2,*,rest of country
+EE,1,*,whole country
+FI,1,0,near the default port / main area
+FI,2,*,rest of country
+FR,1,75;76;77;78;91;92;93;94;95;27;14;60;80;62;59,near the default port / main area
+FR,2,*,rest of country
+FR,MANUAL,20;97;98,Corsica / overseas departments
+DE,1,19;20;21;22;23;24;25;26;27;28;29;30;31,near the default port / main area
+DE,2,*,rest of country
+GR,1,10;11;12;13;14;15;16;17;18;19,near the default port / main area
+GR,2,*,rest of country
+HU,1,*,whole country
+IE,1,D,near the default port / main area
+IE,2,*,rest of country
+IT,1,10;12;13;15;16;17;18;19;20,near the default port / main area
+IT,2,*,rest of country
+IT,MANUAL,07;08;09,Sardinia
+LV,1,*,whole country
+LT,1,*,whole country
+LU,1,*,whole country
+MT,1,*,whole country
+NL,1,*,whole country
+PL,1,80;81;82;83;84;85;86,near the default port / main area
+PL,2,*,rest of country
+PT,1,*,whole country
+PT,MANUAL,9,Azores / Madeira
+RO,1,*,whole country
+SK,1,*,whole country
+SI,1,*,whole country
+ES,1,46;03;12;02;16;30,near the default port / main area
+ES,2,*,rest of country
+ES,MANUAL,07;35;38;51;52,Balearics / Canaries / Ceuta / Melilla
+SE,1,40;41;42;43;44;45;46;47,near the default port / main area
+SE,2,*,rest of country

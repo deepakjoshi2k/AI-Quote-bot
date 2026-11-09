@@ -1,0 +1,16 @@
+service,port,code,description,basis,rate,min_charge,currency,data_status
+FCL,NLRTM,DTHC,Destination terminal handling (Rotterdam),per container,230.00,0,GBP,MOCK - NOT REAL RATES
+FCL,BEANR,DTHC,Destination terminal handling (Antwerp),per container,220.00,0,GBP,MOCK - NOT REAL RATES
+FCL,DEHAM,DTHC,Destination terminal handling (Hamburg),per container,240.00,0,GBP,MOCK - NOT REAL RATES
+FCL,FRLEH,DTHC,Destination terminal handling (Le Havre),per container,235.00,0,GBP,MOCK - NOT REAL RATES
+FCL,ESVLC,DTHC,Destination terminal handling (Valencia),per container,190.00,0,GBP,MOCK - NOT REAL RATES
+FCL,ITGOA,DTHC,Destination terminal handling (Genoa),per container,210.00,0,GBP,MOCK - NOT REAL RATES
+FCL,GRPIR,DTHC,Destination terminal handling (Piraeus),per container,180.00,0,GBP,MOCK - NOT REAL RATES
+FCL,PLGDN,DTHC,Destination terminal handling (Gdansk),per container,170.00,0,GBP,MOCK - NOT REAL RATES
+FCL,SEGOT,DTHC,Destination terminal handling (Gothenburg),per container,225.00,0,GBP,MOCK - NOT REAL RATES
+FCL,SIKOP,DTHC,Destination terminal handling (Koper),per container,185.00,0,GBP,MOCK - NOT REAL RATES
+FCL,ALL,DO,Delivery order / release fee (EU),per bill of lading,60.00,0,GBP,MOCK - NOT REAL RATES
+LCL,ALL,DCFS,Destination CFS / devanning (EU),per W/M,30.00,30.00,GBP,MOCK - NOT REAL RATES
+LCL,ALL,DO,Delivery order / release fee (EU),per bill of lading,50.00,0,GBP,MOCK - NOT REAL RATES
+ALL,ALL,IMPCLR,EU import customs declaration (via EU customs partner),per entry,85.00,0,GBP,MOCK - NOT REAL RATES
+ALL,ALL,DUTYVAT,EU import duty and import VAT,at cost (paid to the EU customs authority),0,0,GBP,NOT INCLUDED - pass-through

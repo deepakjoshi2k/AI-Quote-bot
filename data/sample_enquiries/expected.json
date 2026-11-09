@@ -11,7 +11,7 @@
       }
     ],
     "origin_port": "CNNGB",
-    "uk_port": "GBFXT",
+    "destination_port": "GBFXT",
     "incoterm": "FOB",
     "delivery_required": true,
     "delivery_postcode": "SL1 4QP",
@@ -27,7 +27,7 @@
     "mode": "sea",
     "service": "lcl",
     "origin_port": "CNSHA",
-    "uk_port": "GBFXT",
+    "destination_port": "GBFXT",
     "incoterm": "EXW",
     "total_volume_cbm": 4.8,
     "total_gross_weight_kg": 1450,
@@ -50,7 +50,7 @@
       }
     ],
     "origin_port": "INNSA",
-    "uk_port": "GBLGP",
+    "destination_port": "GBLGP",
     "incoterm": "CIF",
     "total_gross_weight_kg": 14000,
     "delivery_required": true,
@@ -106,7 +106,7 @@
       }
     ],
     "origin_port": "BRSSZ",
-    "uk_port": "GBFXT",
+    "destination_port": "GBFXT",
     "incoterm": "FOB",
     "delivery_postcode": "BS2 0XS",
     "zone": "3",
@@ -128,7 +128,7 @@
       }
     ],
     "origin_port": null,
-    "uk_port": "GBFXT",
+    "destination_port": "GBFXT",
     "incoterm": "DAP",
     "delivery_postcode": "MK1 1AA",
     "flags": [],
@@ -162,7 +162,7 @@
     "mode": "sea",
     "service": "lcl",
     "origin_port": "VNSGN",
-    "uk_port": "GBSOU",
+    "destination_port": "GBSOU",
     "incoterm": "FOB",
     "total_volume_cbm": 0.6,
     "total_gross_weight_kg": 210,
@@ -179,7 +179,7 @@
     "mode": "sea",
     "service": "lcl",
     "origin_port": "INNSA",
-    "uk_port": "GBFXT",
+    "destination_port": "GBFXT",
     "incoterm": "FOB",
     "total_volume_cbm": 4.8,
     "total_gross_weight_kg": 720,
@@ -207,7 +207,10 @@
     "total_gross_weight_kg": 21000,
     "delivery_postcode": "51300",
     "flags": [
-      "non_uk_destination"
-    ]
+      "customer_not_buyer",
+      "heavy_container"
+    ],
+    "destination_port": "FRLEH",
+    "zone": "2"
   }
 }

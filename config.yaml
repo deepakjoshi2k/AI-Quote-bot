@@ -13,8 +13,7 @@ fcl:
 # Where Lincoln Cargo operates. A shipment whose DESTINATION is in this list is an "import".
 # EU-27 + UK. Add NO / CH / IS etc. if they also count.
 home_countries: [GB, AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT, LV, LT, LU, MT, NL, PL, PT, RO, SK, SI, ES, SE]
-# Destinations v1 can actually price (our rate sheets only cover UK delivery and UK ports).
-priced_destination_countries: [GB]
+# Which of these we can price comes from the data: GB + countries in data/eu_country_ports.csv.
 
 default_uk_port: GBFXT    # used when the email names no UK port and the sheet has several
 cbm_mismatch_tolerance: 0.05   # note it if stated CBM and carton CBM differ by more than 5%

@@ -8,7 +8,7 @@
     "origin_country": "CN",
     "origin_place": "Ningbo",
     "origin_port_name": "Ningbo",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "40ft high cube",
@@ -56,7 +56,7 @@
     "service": "fcl",
     "origin_country": "IN",
     "origin_port_name": "Nhava Sheva",
-    "uk_port_name": "London Gateway",
+    "destination_port_name": "London Gateway",
     "containers": [
       {
         "container_type": "20ft",
@@ -104,7 +104,7 @@
     "service": "fcl",
     "origin_country": "BR",
     "origin_port_name": "Santos",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "20ft",
@@ -124,7 +124,7 @@
     "direction": "import",
     "mode": "sea",
     "service": "fcl",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "40HC",
@@ -151,7 +151,7 @@
     "incoterm": "DAP",
     "incoterm_place": "Heathrow",
     "destination_country": "GB",
-    "uk_port_name": "Heathrow"
+    "destination_port_name": "Heathrow"
   },
   "I09": {
     "direction": "export",
@@ -159,7 +159,7 @@
     "service": "fcl",
     "origin_country": "GB",
     "origin_place": "Birmingham",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "containers": [
       {
         "container_type": "20ft",
@@ -179,7 +179,7 @@
     "service": "lcl",
     "origin_country": "VN",
     "origin_port_name": "Ho Chi Minh City",
-    "uk_port_name": "Southampton",
+    "destination_port_name": "Southampton",
     "total_volume_cbm": 0.6,
     "total_weight": 210,
     "weight_unit": "kg",
@@ -200,7 +200,7 @@
     "service": "lcl",
     "origin_country": "IN",
     "origin_port_name": "Nhava Sheva",
-    "uk_port_name": "Felixstowe",
+    "destination_port_name": "Felixstowe",
     "cartons": [
       {
         "quantity": 40,

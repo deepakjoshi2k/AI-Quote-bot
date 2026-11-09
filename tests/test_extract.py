@@ -94,8 +94,8 @@ def test_unsupported_container_goes_to_special():
 # ---------- ports, postcode, UN ----------
 
 def test_ports_mapped():
-    e = normalise(RawEnquiry(origin_port_name="Nhava Sheva", uk_port_name="London Gateway"))
-    assert (e.origin_port, e.uk_port) == ("INNSA", "GBLGP")
+    e = normalise(RawEnquiry(origin_port_name="Nhava Sheva", destination_port_name="London Gateway"))
+    assert (e.origin_port, e.destination_port) == ("INNSA", "GBLGP")
 
 
 def test_unknown_origin_port_kept_as_name():
@@ -103,9 +103,9 @@ def test_unknown_origin_port_kept_as_name():
     assert e.origin_port is None and e.origin_port_name == "Atlantis"
 
 
-def test_unknown_uk_port_flagged():
-    e = normalise(RawEnquiry(uk_port_name="Hull docks", direction="import", mode="sea", destination_country="GB"))
-    assert e.uk_port is None and any("unsupported UK port" in s for s in e.special_requirements)
+def test_unknown_arrival_port_flagged():
+    e = normalise(RawEnquiry(destination_port_name="Hull docks", direction="import", mode="sea", destination_country="GB"))
+    assert e.destination_port is None and any("unsupported arrival port" in s for s in e.special_requirements)
 
 
 def test_postcode_normalised():
@@ -126,13 +126,13 @@ def test_un_number_sets_hazardous():
 
 def test_default_uk_port_filled_and_noted():
     e = apply_defaults(normalise(RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai")))
-    assert e.uk_port == "GBFXT"
+    assert e.destination_port == "GBFXT"
     assert any("UK port not stated" in n for n in e.extraction_notes)
 
 
 def test_default_not_applied_when_no_lane():
     e = apply_defaults(normalise(RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Santos")))
-    assert e.uk_port is None
+    assert e.destination_port is None
 
 
 # ---------- prompt + LLM plumbing ----------
@@ -248,5 +248,5 @@ def test_uk_alias_normalised():
 
 
 def test_export_port_not_taken_as_destination():
-    e = normalise(RawEnquiry(direction="export", origin_country="GB", uk_port_name="Felixstowe"))
+    e = normalise(RawEnquiry(direction="export", origin_country="GB", destination_port_name="Felixstowe"))
     assert e.destination_country is None and e.direction is Direction.EXPORT
