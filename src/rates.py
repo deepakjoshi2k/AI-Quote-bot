@@ -39,14 +39,16 @@ class RateBook:
         self.eu_delivery = read("eu_delivery_rates.csv")
         self.eu_country_ports = read("eu_country_ports.csv")
         aliases = read("port_aliases.csv")
-        self.port_aliases = {a.strip().lower(): c.strip().upper() for a, c in zip(aliases["alias"], aliases["locode"])}
+        self.port_aliases = {" ".join(a.strip().lower().replace("-", " ").split()): c.strip().upper()
+                             for a, c in zip(aliases["alias"], aliases["locode"])}
 
     # ---------- ports & countries ----------
     def port_code(self, name: str | None) -> str | None:
         """'Ningbo' -> 'CNNGB'. Accepts a LOCODE directly. Unknown -> None."""
         if not name:
             return None
-        key = name.strip().lower().removesuffix(" port").removeprefix("port of ").strip()
+        key = " ".join(name.strip().lower().replace("-", " ").replace("_", " ").split())
+        key = key.removesuffix(" port").removeprefix("port of ").removeprefix("the ").strip()
         if key.upper() in set(self.port_aliases.values()):
             return key.upper()
         return self.port_aliases.get(key)

@@ -1,3 +1,5 @@
+import pytest
+
 from src.models import Service
 from src.rates import load_rate_book, service_key
 
@@ -66,3 +68,16 @@ def test_destinations_for():
     assert rb.destinations_for("CNSHA", Service.LCL) == ["GBFXT"]
     assert rb.destinations_for("CNSHA", Service.FCL, ["40HC"]) == ["GBFXT", "GBSOU"]
     assert "DEHAM" in rb.destinations_for("CNSHA", Service.LCL, country="DE")
+
+
+@pytest.mark.parametrize("name", ["Fos", "FOS", "Fos-sur-Mer", "fos sur mer", "Port of Fos", "Marseille-Fos",
+                                  "Marseille Fos", "Port of Marseille-Fos", "FRFOS"])
+def test_fos_recognised_and_priced(name):
+    rb = load_rate_book()
+    assert rb.port_code(name) == "FRFOS"
+    assert "FRFOS" in rb.destination_ports()
+
+
+def test_hyphen_and_spacing_ignored():
+    rb = load_rate_book()
+    assert rb.port_code("London-Gateway") == rb.port_code("london  gateway") == "GBLGP"

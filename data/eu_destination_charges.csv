@@ -9,6 +9,7 @@ FCL,GRPIR,DTHC,Destination terminal handling (Piraeus),per container,180.00,0,GB
 FCL,PLGDN,DTHC,Destination terminal handling (Gdansk),per container,170.00,0,GBP,MOCK - NOT REAL RATES
 FCL,SEGOT,DTHC,Destination terminal handling (Gothenburg),per container,225.00,0,GBP,MOCK - NOT REAL RATES
 FCL,SIKOP,DTHC,Destination terminal handling (Koper),per container,185.00,0,GBP,MOCK - NOT REAL RATES
+FCL,FRFOS,DTHC,Destination terminal handling (Fos-sur-Mer / Marseille-Fos),per container,225.00,0,GBP,MOCK - NOT REAL RATES
 FCL,ALL,DO,Delivery order / release fee (EU),per bill of lading,60.00,0,GBP,MOCK - NOT REAL RATES
 LCL,ALL,DCFS,Destination CFS / devanning (EU),per W/M,30.00,30.00,GBP,MOCK - NOT REAL RATES
 LCL,ALL,DO,Delivery order / release fee (EU),per bill of lading,50.00,0,GBP,MOCK - NOT REAL RATES

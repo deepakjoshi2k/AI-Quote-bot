@@ -18,7 +18,13 @@ HUBS = {
     "NLRTM": ("Rotterdam", 0.97, 230), "BEANR": ("Antwerp", 0.98, 220), "DEHAM": ("Hamburg", 1.00, 240),
     "FRLEH": ("Le Havre", 1.00, 235), "ESVLC": ("Valencia", 0.92, 190), "ITGOA": ("Genoa", 0.93, 210),
     "GRPIR": ("Piraeus", 0.88, 180), "PLGDN": ("Gdansk", 1.06, 170), "SEGOT": ("Gothenburg", 1.08, 225),
-    "SIKOP": ("Koper", 0.95, 185),
+    "SIKOP": ("Koper", 0.95, 185), "FRFOS": ("Fos-sur-Mer / Marseille-Fos", 0.90, 225),
+}
+
+# Extra arrival ports with delivery rates into a country (besides its default port):
+# country -> [(port, km zone 1, km zone 2)]. Zones are the country's (eu_postcode_zones.csv).
+EXTRA_DELIVERY_PORTS = {
+    "FR": [("FRFOS", 780, 600)],   # FR zone 1 = Paris/North (far from Fos), zone 2 = rest of France
 }
 
 # Base Asia/Middle East -> North Europe ocean rates (GBP), per origin
@@ -115,6 +121,14 @@ def main() -> None:
             deliv.append(["FCL", port, c, zone, f"{f:.2f}", f"{f:.2f}", "per container", "GBP", MOCK])
             first = lcl_first(km, feeder)
             deliv.append(["LCL", port, c, zone, f"{first:.2f}", f"{round(first * 0.4):.2f}", "per pallet", "GBP", MOCK])
+    for c, extra in EXTRA_DELIVERY_PORTS.items():
+        feeder = COUNTRIES[c][4]
+        for port, km1, km2 in extra:
+            for zone, km in [("1", km1), ("2", km2)]:
+                f = fcl_delivery(km, feeder)
+                deliv.append(["FCL", port, c, zone, f"{f:.2f}", f"{f:.2f}", "per container", "GBP", MOCK])
+                first = lcl_first(km, feeder)
+                deliv.append(["LCL", port, c, zone, f"{first:.2f}", f"{round(first * 0.4):.2f}", "per pallet", "GBP", MOCK])
     write("eu_delivery_rates.csv",
           ["service", "port", "country", "zone", "first_unit", "additional_unit", "unit", "currency", "data_status"], deliv)
 

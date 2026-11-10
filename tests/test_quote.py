@@ -121,3 +121,11 @@ def test_run_writes_log(fake_llm, tmp_path, monkeypatch):
     monkeypatch.setattr("src.pipeline.LOG_DIR", tmp_path)
     run_enquiry(sample_text("I01"), llm=fake_llm)
     assert len(list(tmp_path.glob("run-*.json"))) == 1
+
+
+def test_france_email_via_fos(fake_llm):
+    e = run_enquiry(sample_text("I12"), llm=fake_llm, log=False).enquiry.model_copy(update={"destination_port": "FRFOS"})
+    q = price(e)
+    # FRFOS DTHC 225 + EU DO 60 + FR zone 2 (51300) haulage from Fos 1260 = 1545; +15% = 1776.75
+    assert q.subtotal == pytest.approx(1545) and q.total == pytest.approx(1776.75)
+    assert "Fos-sur-Mer" in q.lane

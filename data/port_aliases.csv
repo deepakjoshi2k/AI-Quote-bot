@@ -53,8 +53,11 @@ göteborg,SEGOT,EU port in rate sheet
 koper,SIKOP,EU port in rate sheet
 bremerhaven,DEBRV,EU port not in rate sheet
 zeebrugge,BEZEE,EU port not in rate sheet
-fos,FRFOS,EU port not in rate sheet
-marseille,FRMRS,EU port not in rate sheet
+fos,FRFOS,EU port in rate sheet
+fos sur mer,FRFOS,EU port in rate sheet
+marseille fos,FRFOS,EU port in rate sheet
+port of marseille fos,FRFOS,EU port in rate sheet
+marseille,FRMRS,EU port not in rate sheet (Marseille east basins; containers usually via Fos)
 barcelona,ESBCN,EU port not in rate sheet
 algeciras,ESALG,EU port not in rate sheet
 la spezia,ITSPE,EU port not in rate sheet

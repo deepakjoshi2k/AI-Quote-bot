@@ -20,7 +20,7 @@ from src.zones import zone_for_address
 PORT_NAMES = {
     "GBFXT": "Felixstowe", "GBSOU": "Southampton", "GBLGP": "London Gateway", "NLRTM": "Rotterdam",
     "BEANR": "Antwerp", "DEHAM": "Hamburg", "FRLEH": "Le Havre", "ESVLC": "Valencia", "ITGOA": "Genoa",
-    "GRPIR": "Piraeus", "PLGDN": "Gdansk", "SEGOT": "Gothenburg", "SIKOP": "Koper",
+    "GRPIR": "Piraeus", "PLGDN": "Gdansk", "SEGOT": "Gothenburg", "SIKOP": "Koper", "FRFOS": "Fos-sur-Mer",
 }
 
 STANDARD_EXCLUSIONS = [
