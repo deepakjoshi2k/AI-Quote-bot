@@ -4,9 +4,9 @@ MOCK / anonymised emails only.
     python -m src.try_email data/sample_enquiries/I12.txt
     python -m src.try_email                                   # paste, then Enter, Ctrl+Z, Enter (Windows)
 
-For Germany/France deliveries it prints a "Maersk inland price look-up" box: type those fields into
-maersk.com, then enter the haulage and fuel you see. The quote is re-priced and saved to
-quotes/quote-<date-time>.txt. Skip (press Enter) and the quote is saved marked as an ESTIMATE.
+For Germany/France deliveries it prints a "Maersk inland price look-up" box FIRST: type those fields into
+maersk.com, then enter the haulage and fuel you see. Only then is the quote shown and saved to
+quotes/quote-<date-time>.txt. Skip (press Enter) and no quote is made (use --estimate to force one).
 
 You can also pass the figures directly:
     python -m src.try_email email.txt --haulage 650 --fuel 46.80 --extra "Toll=35" --heavy 0
@@ -23,7 +23,7 @@ from src.haulage import HaulageCheck, lookup_instructions, needs_lookup
 from src.pipeline import run_enquiry
 from src.quote import price
 from src.quote_text import render_quote_text, save_quote_text
-from src.report import format_result
+from src.report import format_quote, format_result
 
 
 def _parse_extra(text: str) -> tuple[str, float]:
@@ -47,7 +47,7 @@ def _ask_number(prompt: str, allow_blank: bool = True) -> float | None:
 def ask_for_check(heavy_possible: bool) -> HaulageCheck | None:
     """Interactive paste-back after the staff look-up. Enter on the first question = skip (estimate)."""
     print()
-    haulage = _ask_number("Maersk haulage per container, IHI (EUR) [Enter = skip, keep ESTIMATE]: ")
+    haulage = _ask_number("Maersk haulage per container, IHI (EUR) [Enter = skip, no quote]: ")
     if haulage is None:
         return None
     fuel = _ask_number("Maersk import fuel surcharge per container, IFS (EUR amount, not %): ", allow_blank=False)
@@ -75,6 +75,8 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--extra", type=_parse_extra, action="append", default=[], help="other inland charge, Name=amount")
     ap.add_argument("--heavy", type=float, help="heavy surcharge per container (0 if included); 22%% fuel is added")
     ap.add_argument("--no-prompt", action="store_true", help="don't ask for Maersk figures")
+    ap.add_argument("--estimate", action="store_true",
+                    help="make the quote with the flat ESTIMATE haulage instead of asking for Maersk figures")
     args = ap.parse_args(argv)
 
     if args.file:
@@ -84,13 +86,16 @@ def main(argv: list[str]) -> None:
         text = sys.stdin.read()
 
     r = run_enquiry(text)
+    lookup = r.quote is not None and needs_lookup(r.enquiry)
+
+    # When Maersk haulage is needed, show NO price until staff have entered the Maersk figures.
     print()
-    print(format_result(r.enquiry, r.triage, r.quote))
+    print(format_result(r.enquiry, r.triage, None if lookup else r.quote))
     if not r.quote:
         return
 
     quote = r.quote
-    if needs_lookup(r.enquiry):
+    if lookup:
         print()
         print(lookup_instructions(r.enquiry))
         check = None
@@ -98,18 +103,22 @@ def main(argv: list[str]) -> None:
             if args.fuel is None:
                 ap.error("--haulage needs --fuel too")
             check = HaulageCheck(args.haulage, args.fuel, args.extra, args.heavy)
-        elif args.file and not args.no_prompt and sys.stdin.isatty():
+        elif args.file and not args.no_prompt and not args.estimate and sys.stdin.isatty():
             n = sum(c.quantity for c in r.enquiry.containers) or 1
             heavy_possible = r.enquiry.total_gross_weight_kg is None or r.enquiry.total_gross_weight_kg / n > 23000
             check = ask_for_check(heavy_possible)
+
         if check:
             quote = price(r.enquiry, haulage_check=check)
-            print(f"\nRe-priced with Maersk figures: TOTAL {quote.currency} {quote.total:,.2f}")
-            print("INTERNAL – staff only, NOT on the customer quote:")
-            for note in quote.internal_notes:
-                print(f"  - {note}")
+        elif args.estimate:
+            print("\n--estimate: quote made with the flat ESTIMATE haulage (marked for staff).")
         else:
-            print("\nNo Maersk figures entered: quote saved as an ESTIMATE.")
+            print("\nNo quote made: enter the Maersk haulage and fuel first.\n"
+                  "Re-run and type them when asked, or pass --haulage <amount> --fuel <amount>.\n"
+                  "(Use --estimate to make an estimate quote anyway.)")
+            return
+        print()
+        print(format_quote(quote))
 
     path = save_quote_text(render_quote_text(r.enquiry, quote, r.triage))
     print(f"\nQuote saved as a text file: {path}")

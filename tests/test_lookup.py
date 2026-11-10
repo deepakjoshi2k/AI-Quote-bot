@@ -107,7 +107,8 @@ def test_cli_flags(monkeypatch, fake_llm, tmp_path, capsys):
     te = _patch_run(monkeypatch, fake_llm, tmp_path)
     te.main(["data/sample_enquiries/I12.txt", "--haulage", "650", "--fuel", "46.80"])
     out = capsys.readouterr().out
-    assert "MAERSK INLAND PRICE LOOK-UP" in out and "TOTAL EUR 1,305.10" in out
+    assert out.index("MAERSK INLAND PRICE LOOK-UP") < out.index("=== QUOTE (")   # look-up first, then the price
+    assert "1,305.10" in out
     assert "1,305.10" in (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
 
 
@@ -117,15 +118,37 @@ def test_cli_interactive(monkeypatch, fake_llm, tmp_path, capsys):
     answers = iter(["650", "46.80", "Toll=35", ""])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
     te.main(["data/sample_enquiries/I12.txt"])
-    assert "TOTAL EUR 1,340.10" in capsys.readouterr().out      # 1305.10 + toll 35
+    out = capsys.readouterr().out
+    assert "1,340.10" in out                                     # 1305.10 + toll 35
+    assert "1,495.90" not in out                                 # the estimate is never shown
 
 
-def test_cli_skip_keeps_estimate(monkeypatch, fake_llm, tmp_path, capsys):
+def test_cli_skip_makes_no_quote(monkeypatch, fake_llm, tmp_path, capsys):
     te = _patch_run(monkeypatch, fake_llm, tmp_path)
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt="": "")
     te.main(["data/sample_enquiries/I12.txt"])
+    out = capsys.readouterr().out
+    assert "No quote made" in out and "=== QUOTE (" not in out and "1,495.90" not in out
+    assert not (tmp_path / "quote-t.txt").exists()
+
+
+def test_cli_estimate_flag(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _patch_run(monkeypatch, fake_llm, tmp_path)
+    te.main(["data/sample_enquiries/I12.txt", "--estimate"])
     assert "ESTIMATE" in (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
+
+
+def test_cli_uk_quote_needs_no_lookup(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _patch_run(monkeypatch, fake_llm, tmp_path)
+    te.main(["data/sample_enquiries/I01.txt"])
+    out = capsys.readouterr().out
+    assert "MAERSK INLAND" not in out and "=== QUOTE (" in out and (tmp_path / "quote-t.txt").exists()
+
+
+def test_no_margin_line_when_zero():
+    from src.report import format_quote
+    assert "Margin" not in format_quote(price(_fr(), haulage_check=HaulageCheck(650.0, 46.80)))
 
 
 
