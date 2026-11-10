@@ -110,3 +110,39 @@ class RateBook:
 @lru_cache(maxsize=1)
 def load_rate_book() -> RateBook:
     return RateBook()
+
+
+# ---------- price lookups (Phase 4) ----------
+
+class RateNotFound(LookupError):
+    """A rate the quote needs is missing from the sheets (triage should have caught this)."""
+
+
+def _one(df: pd.DataFrame, what: str) -> pd.Series:
+    if df.empty:
+        raise RateNotFound(f"No rate for {what}")
+    return df.iloc[0]
+
+
+def _dest_sheet(rb: RateBook, country: str | None) -> tuple[pd.DataFrame, str]:
+    """UK sheet uses column 'uk_port', EU sheet uses 'port'."""
+    return (rb.uk_destination, "uk_port") if country in (None, "GB") else (rb.eu_destination, "port")
+
+
+def destination_charge(rb: RateBook, country: str | None, port: str, code: str, service: str = "FCL") -> pd.Series:
+    """A destination charge row (DTHC, DO, IMPCLR...). Port-specific rows win over 'ALL'."""
+    df, col = _dest_sheet(rb, country)
+    rows = df[(df["code"] == code) & (df["service"].isin([service, "ALL"]))]
+    specific = rows[rows[col] == port]
+    return _one(specific if not specific.empty else rows[rows[col] == "ALL"], f"{code} at {port}")
+
+
+def delivery_rate(rb: RateBook, country: str | None, port: str, zone: str, service: str = "FCL") -> pd.Series:
+    """Delivery row with first_unit / additional_unit for this port and zone."""
+    if country in (None, "GB"):
+        d = rb.uk_delivery
+        rows = d[(d["service"] == service) & (d["uk_port"].isin([port, "ALL"])) & (d["zone"] == zone)]
+    else:
+        d = rb.eu_delivery
+        rows = d[(d["service"] == service) & (d["port"] == port) & (d["country"] == country) & (d["zone"] == zone)]
+    return _one(rows, f"delivery {port} -> {country or 'GB'} zone {zone}")
