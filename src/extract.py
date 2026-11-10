@@ -3,7 +3,7 @@
 Two halves, kept separate on purpose:
   1. extract_raw()  - the LLM copies what the email says into RawEnquiry (no maths).
   2. normalise()    - Python converts units, maps ports to codes, computes CBM, validates.
-  3. apply_defaults() fills gaps we can safely fill from the rate sheet (and says so).
+  3. apply_defaults() is a no-op: nothing is assumed (see its docstring).
 Only step 1 touches the LLM, so steps 2-3 are fully unit-tested.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from src.config import load_config
 from src.llm import LLMClient, get_llm
-from src.measures import cbm_from_cartons, suggest_service, to_cm, to_kg, weight_from_cartons
+from src.measures import cbm_from_cartons, to_cm, to_kg, weight_from_cartons
 from src.models import (
     CartonLine, ContainerLine, CustomerRole, Direction, Enquiry, Incoterm, Mode, RawEnquiry, Service,
 )
@@ -118,11 +118,9 @@ def decide_direction(origin: str | None, destination: str | None, llm_direction:
         if origin:
             return Direction.CROSS_TRADE, None
         return Direction.UNKNOWN, f"Destination {destination} is outside the UK/EU and origin is unknown"
-    # Destination unknown: only accept the LLM's label when the countries don't contradict it.
+    # Destination not written: don't assume one. Only a written UK/EU origin + "export" is clear enough.
     if llm_direction == "export" and origin in home:
         return Direction.EXPORT, None
-    if llm_direction == "import" and origin not in home:
-        return Direction.IMPORT, "Destination country not stated; assumed UK/EU import"
     return Direction.UNKNOWN, None
 
 
@@ -200,12 +198,6 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
         service = Service.FCL
     elif raw.service in ("lcl", "fcl"):
         service = Service(raw.service)
-    elif volume is not None:
-        suggested = suggest_service(volume, cfg["service_thresholds"]["lcl_max_cbm"],
-                                    cfg["service_thresholds"]["fcl_min_cbm"])
-        service = Service.LCL if suggested is Service.LCL else Service.UNKNOWN
-        if service is Service.LCL:
-            notes.append(f"Service not stated; assumed LCL for {volume:.2f} CBM")
     else:
         service = Service.UNKNOWN
 
@@ -280,40 +272,15 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
     )
 
 
-# ---------- 3. Safe defaults from the rate sheet ----------
+# ---------- 3. Defaults (none for now) ----------
 
 def apply_defaults(enquiry: Enquiry, rate_book: RateBook | None = None) -> Enquiry:
-    """Fill the arrival port when the email doesn't name one, and say so.
+    """No defaults: nothing is filled in that the email doesn't say.
 
-    EU country: its default port from eu_country_ports.csv (staff confirm the routing).
-    UK: config default_uk_port if the lane exists, else the only UK port with a rate.
+    Placeholder for Lincoln Cargo's routing table (e.g. "France -> Le Havre"): when we have it,
+    an estimated port can be added here, clearly labelled, while still asking the sender.
     """
-    rb = rate_book or load_rate_book()
-    cfg = load_config()
-    e = enquiry.model_copy(deep=True)
-    if e.destination_port is not None or e.direction is not Direction.IMPORT or e.mode is not Mode.SEA:
-        return e
-    if e.destination_country and e.destination_country != "GB":
-        port, note = rb.default_port_for_country(e.destination_country)
-        if port:
-            e.destination_port = port
-            e.extraction_notes.append(f"Arrival port not stated; default for {e.destination_country} is {port}"
-                                      + (f" ({note})" if note else "") + ": staff to confirm routing")
-        return e
-    if e.origin_port and e.service is not Service.UNKNOWN:
-        types = [c.container_type for c in e.containers]
-        options = rb.destinations_for(e.origin_port, e.service, types, country="GB")
-        choice = None
-        if cfg["default_uk_port"] in options:
-            choice = cfg["default_uk_port"]
-        elif len(options) == 1:
-            choice = options[0]
-        if choice:
-            e.destination_port = choice
-            e.extraction_notes.append(f"UK port not stated; assumed {choice}")
-            if e.destination_country is None:
-                e.destination_country = "GB"
-    return e
+    return enquiry
 
 
 def extract_enquiry(text: str, llm: LLMClient | None = None, rate_book: RateBook | None = None) -> Enquiry:

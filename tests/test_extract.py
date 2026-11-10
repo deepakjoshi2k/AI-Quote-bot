@@ -76,9 +76,9 @@ def test_containers_mean_fcl():
     assert e.service is Service.FCL
 
 
-def test_small_volume_assumed_lcl():
-    e = normalise(RawEnquiry(total_volume_cbm=3))
-    assert e.service is Service.LCL
+def test_volume_alone_does_not_set_service():
+    # No assumptions: 3 CBM is "probably LCL", but only a written FCL/LCL counts.
+    assert normalise(RawEnquiry(total_volume_cbm=3)).service is Service.UNKNOWN
 
 
 def test_mid_volume_left_unknown():
@@ -124,10 +124,10 @@ def test_un_number_sets_hazardous():
 
 # ---------- defaults ----------
 
-def test_default_uk_port_filled_and_noted():
-    e = apply_defaults(normalise(RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai")))
-    assert e.destination_port == "GBFXT"
-    assert any("UK port not stated" in n for n in e.extraction_notes)
+def test_no_default_port_is_filled():
+    e = apply_defaults(normalise(RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai",
+                                            destination_country="GB")))
+    assert e.destination_port is None
 
 
 def test_default_not_applied_when_no_lane():
@@ -214,7 +214,7 @@ HOME = {"GB", "FR", "NL", "DE"}
     ("CN", "US", "import", Direction.CROSS_TRADE),
     (None, "US", "import", Direction.UNKNOWN),
     ("GB", None, "export", Direction.EXPORT),
-    ("VN", None, "import", Direction.IMPORT),
+    ("VN", None, "import", Direction.UNKNOWN),       # destination not written: not assumed
     ("GB", None, "import", Direction.UNKNOWN),       # contradicts: ask
     (None, None, "unknown", Direction.UNKNOWN),
 ])

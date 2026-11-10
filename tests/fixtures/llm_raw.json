@@ -33,7 +33,7 @@
     "service": "lcl",
     "origin_country": "CN",
     "origin_place": "Songjiang, Shanghai",
-    "origin_port_name": "Shanghai",
+    "origin_port_name": null,
     "total_volume_cbm": 4.8,
     "total_weight": 1450,
     "weight_unit": "kg",
@@ -42,9 +42,7 @@
     "incoterm": "EXW",
     "delivery_required": true,
     "delivery_postcode": "SL3 0HJ",
-    "notes": [
-      "Port of loading assumed Shanghai from supplier location"
-    ],
+    "notes": [],
     "destination_country": "GB",
     "customer_role": "buyer"
   },
@@ -228,7 +226,7 @@
     "customer_role": "buyer"
   },
   "I12": {
-    "customer_role": "agent",
+    "customer_role": "unknown",
     "direction": "import",
     "mode": "sea",
     "service": "fcl",
@@ -248,7 +246,8 @@
     "delivery_postcode": "51300",
     "delivery_place": "Vitry-le-François, France",
     "notes": [
-      "Customer asks for the nearest POD to the delivery address"
+      "Sender asks us to advise the nearest port of discharge",
+      "Net weight 18 t and gross weight 21 t both given"
     ]
   }
 }

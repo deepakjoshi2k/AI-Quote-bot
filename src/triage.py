@@ -75,9 +75,9 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
         block(TriageFlag.DANGEROUS_GOODS,
               f"Dangerous goods ({detail}): needs DG-qualified staff, IMDG booking and a Safety Data Sheet (SDS).")
 
-    # 3. Who is asking? Useful context for whichever team gets it.
+    # 3. Who is asking? Only acted on when the email SAYS it (role unclear -> asked in _missing_fields).
     if e.customer_role in (CustomerRole.SELLER, CustomerRole.AGENT):
-        role_note = (f"Enquirer appears to be the {e.customer_role.value}, not the importer: "
+        role_note = (f"The sender says they are the {e.customer_role.value}, not the importer: "
                      "the Incoterm split is the other way round for them.")
         if routed_elsewhere:
             info.append(role_note)
@@ -109,8 +109,10 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
     n20 = sum(c.quantity for c in e.containers if c.container_type == "20GP")
     n_all = sum(c.quantity for c in e.containers)
     if n20 and e.total_gross_weight_kg and e.total_gross_weight_kg / n_all > heavy:
-        block(TriageFlag.HEAVY_CONTAINER,
-              f"Heavy 20GP (~{e.total_gross_weight_kg / n_all:,.0f} kg per container): check road weight limits for delivery.")
+        # A warning for staff, not a blocker: the shipment can still be quoted or followed up.
+        flags.append(TriageFlag.HEAVY_CONTAINER)
+        info.append(f"Heavy 20GP (~{e.total_gross_weight_kg / n_all:,.0f} kg per container): "
+                    "check road weight limits / special chassis for delivery.")
 
     # Lane checks only make sense once we know which legs the importer pays for.
     if sections is not None and e.mode is not Mode.AIR and e.direction is not Direction.EXPORT:
@@ -159,10 +161,22 @@ def _manual_checks(e: Enquiry, sections: ChargeSections | None, rb: RateBook, cf
     return reasons, flags, info
 
 
+def role_unclear(e: Enquiry) -> bool:
+    """Under DAP/DDP the supplier normally arranges delivery to the door. If the sender asks US to
+    deliver and hasn't said who they are, we can't tell which charges are theirs: ask."""
+    return (e.incoterm in (Incoterm.DAP, Incoterm.DDP) and e.delivery_required is True
+            and e.customer_role not in (CustomerRole.SELLER, CustomerRole.AGENT))
+
+
 def _missing_fields(e: Enquiry, sections: ChargeSections | None, cfg: dict) -> tuple[list[str], list[str]]:
-    """Returns (required missing, optional missing)."""
+    """Returns (required missing, optional missing). Each item is phrased as a question topic."""
     req: list[str] = []
     opt: list[str] = []
+
+    if role_unclear(e):
+        req.append(f"are you the importer (buyer), the supplier/shipper, or acting for one of them? "
+                   f"Under {e.incoterm.value} the supplier normally arranges delivery to the door, so this "
+                   "decides which charges we quote to you")
 
     if e.direction is Direction.UNKNOWN:
         req.append("where the goods are coming from and going to (countries)")
@@ -190,11 +204,13 @@ def _missing_fields(e: Enquiry, sections: ChargeSections | None, cfg: dict) -> t
 
     if sections is None or _needs_origin_port(sections):
         if e.origin_port is None and not e.origin_port_name:
-            req.append("origin port or supplier's city")
+            req.append("origin: country and port of loading (or supplier's address)")
     if sections is not None and (sections.origin_pickup and not e.origin_place):
         opt.append("supplier's collection address")
-    if sections is not None and _needs_destination_port(sections) and e.destination_port is None:
-        req.append("port of arrival")
+    needs_port = _needs_destination_port(sections) if sections is not None else (
+        e.mode is Mode.SEA and e.direction is Direction.IMPORT)
+    if needs_port and e.destination_port is None:
+        req.append("port of arrival (discharge port)")
 
     delivery_possible = sections is None or e.incoterm not in (Incoterm.DAP, Incoterm.DDP)
     if delivery_possible:
@@ -216,7 +232,7 @@ def triage(enquiry: Enquiry, rate_book: RateBook | None = None) -> Triage:
     e = enquiry
 
     sections = None
-    if e.incoterm is not Incoterm.UNKNOWN:
+    if e.incoterm is not Incoterm.UNKNOWN and not role_unclear(e):
         sections = charge_sections(e.incoterm, e.delivery_required)
 
     blocking, flags, info = _manual_checks(e, sections, rb, cfg)
