@@ -22,16 +22,17 @@ def _fcl(**overrides) -> Enquiry:
     ("I03", 1000.00, 1150.00),   # LGP DTHC 250 + DO 65 + customs 65 + haulage zone 2 620
     ("I06", 1290.00, 1483.50),   # FXT DTHC 245 + DO 65 + haulage zone 3 980 (no customs asked)
     ("I07", 65.00, 74.75),       # customs clearance only
+    ("I12", 1308.20, 1308.20),   # France DAP, real DE/FR tariff (EUR, no markup), see test_france_email_tariff
 ])
 def test_sample_totals(sid, subtotal, total, fake_llm):
     r = run_enquiry(sample_text(sid), llm=fake_llm, log=False)
     assert r.triage.status == "quote"
     assert r.quote.subtotal == pytest.approx(subtotal)
     assert r.quote.total == pytest.approx(total)
-    assert r.quote.is_mock
+    assert r.quote.is_mock == (sid != "I12")      # I12 is priced from the real DE/FR tariff
 
 
-@pytest.mark.parametrize("sid", ["I02", "I04", "I05", "I08", "I09", "I10", "I11", "I12"])
+@pytest.mark.parametrize("sid", ["I02", "I04", "I05", "I08", "I09", "I10", "I11"])
 def test_non_quotable_samples_have_no_quote(sid, fake_llm):
     assert run_enquiry(sample_text(sid), llm=fake_llm, log=False).quote is None
 
@@ -53,10 +54,11 @@ def test_two_containers_two_types():
     assert [l.quantity for l in q.lines if l.code == "DTHC"] == [2, 1]
 
 
-def test_no_delivery_when_not_asked():
+def test_no_delivery_only_when_declined():
     q = price(_fcl(delivery_required=False))
     assert {l.code for l in q.lines} == {"DTHC", "DO"}
     assert any("Delivery from the port" in x for x in q.exclusions)
+    assert "HAUL" in {l.code for l in price(_fcl(delivery_required=None)).lines}   # not mentioned -> we deliver
 
 
 def test_clearance_line_only_when_asked():
@@ -78,29 +80,72 @@ def test_amounts_rounded_to_pence():
         assert round(l.amount, 2) == l.amount
 
 
-# ---------- EU ----------
+# ---------- EU: Germany & France use Lincoln Cargo's tariff (data/tariffs/eu_de_fr.yaml) ----------
 
-def test_eu_hamburg():
-    e = _fcl(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095")
-    q = price(e)
-    # DEHAM DTHC 240 + EU DO 60 + DE zone 1 haulage 540 = 840; +15% = 966
-    assert q.subtotal == pytest.approx(840) and q.total == pytest.approx(966)
-
-
-def test_france_email_once_port_is_known(fake_llm):
-    # The France DAP email (I12) needs a port; with "Le Havre" added it prices.
-    text = sample_text("I12")
-    r = run_enquiry(text, llm=fake_llm, log=False)
-    assert r.quote is None
-    e = r.enquiry.model_copy(update={"destination_port": "FRLEH"})
-    q = price(e)
-    # FRLEH DTHC 235 + EU DO 60 + FR zone 2 (51300) haulage 1180 = 1475; +15% = 1696.25
-    assert q.subtotal == pytest.approx(1475) and q.total == pytest.approx(1696.25)
-    assert "IMPCLR" not in {l.code for l in q.lines}      # DAP, clearance not asked
+def test_france_email_tariff(fake_llm):
+    """The real France DAP email: 1 x 20GP, 21 t, delivered to 51300, no customs asked."""
+    r = run_enquiry(sample_text("I12"), llm=fake_llm, log=False)
+    assert r.triage.status == "quote"            # same charges at every French port: port not needed
+    q = r.quote
+    assert q.currency == "EUR" and q.margin == 0 and not q.is_mock
+    # THC 290 + Doc 50 + Sec 25 + Lo/Lo 90 + haulage 720 + fuel 18.5% of 720 (133.20) = 1308.20
+    assert [(l.code, l.amount) for l in q.lines] == [
+        ("THC", 290.0), ("DOC", 50.0), ("SEC", 25.0), ("LOLO", 90.0), ("HAUL", 720.0), ("HAUL-FUEL", 133.2)]
+    assert q.total == pytest.approx(1308.20)
+    assert any("non-hazardous" in t for t in q.terms) and any("French import VAT" in t for t in q.terms)
 
 
-def test_eu_clearance_uses_eu_fee():
+def test_same_charges_any_port_in_country(fake_llm):
+    e = run_enquiry(sample_text("I12"), llm=fake_llm, log=False).enquiry
+    totals = {price(e.model_copy(update={"destination_port": p})).total for p in [None, "FRLEH", "FRFOS"]}
+    assert totals == {1308.20}
+
+
+def test_germany_two_heavy_containers_with_customs():
     e = _fcl(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095",
+             containers=[ContainerLine(container_type="40HC", quantity=2)], total_gross_weight_kg=50000,
+             customs_clearance_requested=True)
+    q = price(e)
+    # per container 25 t > 23 t: THC 2x290 + Doc 50 + Sec 2x25 + Lo/Lo 2x90 + Customs 150
+    #   + haulage 2x720 + fuel 2x133.20 + heavy 2x200 + fuel 2x37 = 3190.40
+    assert q.total == pytest.approx(580 + 50 + 50 + 180 + 150 + 1440 + 266.4 + 400 + 74)
+    assert any("Import VAT 19% (Germany)" in t for t in q.terms)
+
+
+def test_23_tonnes_exactly_is_not_heavy():
+    e = _fcl(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095",
+             containers=[ContainerLine(container_type="20GP", quantity=1)], total_gross_weight_kg=23000)
+    assert "HEAVY" not in {l.code for l in price(e).lines}
+
+
+def test_tariff_weight_not_stated_is_an_assumption():
+    q = price(_fcl(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095"))
+    assert any("Weight not stated" in a for a in q.assumptions)
+
+
+def test_tariff_ddp_adds_indemnity_term():
+    q = price(_fcl(destination_country="FR", destination_port="FRLEH", delivery_postcode="51300",
+                   incoterm=Incoterm.DDP))
+    assert any("indemnity" in t for t in q.terms)
+
+
+def test_tariff_clearance_only():
+    e = _fcl(destination_country="DE", destination_port=None, clearance_only=True,
+             customs_clearance_requested=True, delivery_required=False)
+    assert [(l.code, l.amount) for l in price(e).lines] == [("CUSTOMS", 150.0)]
+
+
+# ---------- other EU countries still use the MOCK sheets ----------
+
+def test_netherlands_mock():
+    e = _fcl(destination_country="NL", destination_port="NLRTM", delivery_postcode="3011 AB")
+    q = price(e)
+    # NLRTM DTHC 230 + EU DO 60 + NL zone 1 haulage 430 = 720; +15% = 828
+    assert q.subtotal == pytest.approx(720) and q.total == pytest.approx(828) and q.is_mock
+
+
+def test_netherlands_clearance_uses_mock_eu_fee():
+    e = _fcl(destination_country="NL", destination_port="NLRTM", delivery_postcode="3011 AB",
              customs_clearance_requested=True)
     assert [l.unit_rate for l in price(e).lines if l.code == "IMPCLR"] == [85.0]
 
@@ -123,9 +168,22 @@ def test_run_writes_log(fake_llm, tmp_path, monkeypatch):
     assert len(list(tmp_path.glob("run-*.json"))) == 1
 
 
-def test_france_email_via_fos(fake_llm):
-    e = run_enquiry(sample_text("I12"), llm=fake_llm, log=False).enquiry.model_copy(update={"destination_port": "FRFOS"})
-    q = price(e)
-    # FRFOS DTHC 225 + EU DO 60 + FR zone 2 (51300) haulage from Fos 1260 = 1545; +15% = 1776.75
-    assert q.subtotal == pytest.approx(1545) and q.total == pytest.approx(1776.75)
-    assert "Fos-sur-Mer" in q.lane
+# ---------- quote text file ----------
+
+def test_quote_text_file(fake_llm, tmp_path):
+    from datetime import date
+    from src.quote_text import render_quote_text, save_quote_text
+    r = run_enquiry(sample_text("I12"), llm=fake_llm, log=False)
+    text = render_quote_text(r.enquiry, r.quote, r.triage, today=date(2026, 11, 10))
+    assert "IMPORT QUOTATION" in text and "MOCK" not in text
+    assert "TOTAL EUR" in text and "1,308.20" in text
+    assert "Valid until:   24 Nov 2026" in text
+    assert "TERMS AND CONDITIONS" in text and "PLEASE ALSO CONFIRM" in text
+    path = save_quote_text(text, folder=tmp_path, stamp="test")
+    assert path.read_text(encoding="utf-8") == text
+
+
+def test_mock_quote_text_is_labelled(fake_llm):
+    from src.quote_text import render_quote_text
+    r = run_enquiry(sample_text("I01"), llm=fake_llm, log=False)
+    assert "MOCK RATES" in render_quote_text(r.enquiry, r.quote)

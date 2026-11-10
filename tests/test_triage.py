@@ -222,15 +222,17 @@ def test_delivery_requested_without_postcode():
     assert t.status == "need_info" and any("postcode" in m for m in t.missing_fields)
 
 
-def test_delivery_not_mentioned_is_side_question():
+def test_delivery_included_unless_declined():
+    assert quote_scope(_fcl(delivery_required=None)).delivery
     t = triage(_fcl(delivery_required=None, delivery_postcode=None))
-    assert t.status == "quote" and any("delivery" in m for m in t.missing_fields)
+    assert t.status == "need_info" and any("delivery address" in m for m in t.missing_fields)
 
 
 # ---------- EU ----------
 
 def _eu(**overrides) -> Enquiry:
-    base = dict(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095")
+    """An EU country WITHOUT a tariff (MOCK sheets): Netherlands."""
+    base = dict(destination_country="NL", destination_port="NLRTM", delivery_postcode="3011 AB")
     base.update(overrides)
     return _fcl(**base)
 
@@ -246,12 +248,25 @@ def test_eu_island_is_manual():
 
 
 def test_eu_port_without_delivery_rate_to_country():
-    t = triage(_eu(destination_port="NLRTM"))
+    t = triage(_eu(destination_port="DEHAM"))   # Hamburg -> Netherlands delivery not in the mock sheet
     assert t.status == "manual_review" and TriageFlag.LANE_NOT_IN_SHEET in t.flags
 
 
 def test_eu_port_not_priced():
-    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in triage(_eu(destination_port="DEBRV")).flags
+    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in triage(_eu(destination_port="BEZEE")).flags
+
+
+def test_tariff_country_any_port_and_no_port_needed():
+    for port in ["DEHAM", "DEBRV", None]:
+        t = triage(_fcl(destination_country="DE", destination_port=port, delivery_postcode="20095"))
+        assert t.status == "quote", (port, t.reasons, t.missing_fields)
+    t = triage(_fcl(destination_country="DE", destination_port=None, delivery_postcode="20095"))
+    assert any("port of arrival" in m for m in t.missing_fields)        # asked, but doesn't block
+
+
+def test_tariff_country_port_in_other_country_is_manual():
+    t = triage(_fcl(destination_country="DE", destination_port="NLRTM", delivery_postcode="20095"))
+    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in t.flags
 
 
 def test_eu_port_name_sets_country():
@@ -265,8 +280,8 @@ def test_i12_france_dap(fake_llm):
     e = extract_enquiry(sample_text("I12"), llm=fake_llm)
     t = triage(e)
     assert e.destination_port is None and e.origin_country is None   # nothing assumed
-    assert t.status == "need_info"
-    assert t.missing_fields == ["port of arrival (discharge port)"]
+    assert t.status == "quote"                                         # tariff: same price at every French port
+    assert t.missing_fields == ["port of arrival (discharge port)"]    # still asked, as a side question
     assert any("Email the importer" in r for r in t.notes)
     assert TriageFlag.HEAVY_CONTAINER not in t.flags and t.reasons == []
 

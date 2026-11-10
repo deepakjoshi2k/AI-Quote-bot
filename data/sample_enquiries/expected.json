@@ -199,7 +199,7 @@
     "destination_country": "GB"
   },
   "I12": {
-    "status": "need_info",
+    "status": "quote",
     "direction": "import",
     "mode": "sea",
     "service": "fcl",
@@ -219,6 +219,7 @@
     "zone": "2",
     "missing_contains": [
       "port of arrival"
-    ]
+    ],
+    "total": 1308.2
   }
 }
