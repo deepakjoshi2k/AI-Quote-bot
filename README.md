@@ -30,4 +30,6 @@ pytest
 - [x] Phase 2 – Incoterm logic (`src/incoterms.py`)
 - [x] Phase 3 – extraction (`llm.py`, `extract.py`, `triage.py`, `zones.py`, lane checks in `rates.py`)
 - [x] Phase 3.1 – direction from countries, customer role, UK **and EU-27** destinations (mock EU sheets via `scripts/make_eu_mock_data.py`)
-- [x] Phase 4 – pricing (`src/quote.py`, `src/pipeline.py`): destination services, UK + EU, FCL (`zones.py`, `rates.py`, `quote.py`)
+- [x] Phase 4 – pricing (`src/quote.py`, `src/pipeline.py`): destination services, UK + EU, FCL
+- [x] Real Lincoln Cargo tariff for **Germany & France** (`data/tariffs/eu_de_fr.yaml`: EUR, no markup, same at every port, terms on the quote). Other countries still use MOCK sheets.
+- [x] Quote saved as a text file in `quotes/` (git-ignored) by `python -m src.try_email` (`zones.py`, `rates.py`, `quote.py`)

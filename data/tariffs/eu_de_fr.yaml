@@ -1,0 +1,46 @@
+# Lincoln Cargo destination tariff for FCL imports into Germany and France.
+# Source: Lincoln Cargo, 10 Nov 2026 (Hamburg rates; "same for France"). Same charges at every port in these countries.
+# These are SELL prices: no markup is added.
+name: "Lincoln Cargo destination tariff – Germany & France (Nov 2026)"
+countries: [DE, FR]
+currency: EUR
+margin_pct: 0
+is_mock: false
+
+# applies:  always     -> every FCL quote
+#           delivery   -> when we deliver (we always deliver unless the sender says not to)
+#           clearance  -> only if the sender asks for customs clearance
+#           heavy      -> per container heavier than heavy_over_kg
+# basis:    container | bl (bill of lading) | hbl (house bill of lading)
+# fuel_pct: fuel surcharge % added on top of that charge
+charges:
+  - {code: THC,     description: "Terminal handling (THC)",          basis: container, amount: 290.00, applies: always}
+  - {code: DOC,     description: "Documentation",                    basis: bl,        amount: 50.00,  applies: always}
+  - {code: SEC,     description: "Security (Sec)",                   basis: container, amount: 25.00,  applies: always}
+  - {code: LOLO,    description: "Lo/Lo (lift on / lift off)",       basis: container, amount: 90.00,  applies: always}
+  - {code: CUSTOMS, description: "Customs clearance",                basis: hbl,       amount: 150.00, applies: clearance}
+  - {code: HAUL,    description: "Road haulage to consignee",        basis: container, amount: 720.00, applies: delivery, fuel_pct: 18.5}
+  - {code: HEAVY,   description: "Heavy container surcharge (over 23 t)", basis: container, amount: 200.00, applies: heavy, fuel_pct: 18.5}
+
+heavy_over_kg: 23000
+
+# Printed on every quote for these countries.
+terms:
+  - "Road haulage is a fixed rate for now; it varies with distance and will be confirmed for the delivery address."
+  - "14 days minimum demurrage and detention free time is required from the shipping line. With anything less, demurrage and detention may apply."
+  - "If there is a delay due to customs inspection, X-ray, or non-availability of haulage during the free time, additional charges apply."
+  - "Free time for unloading is 2 hours; after that EUR 75 per hour applies."
+  - "Containers are delivered to the consignee, who must arrange unloading of the cargo from the container."
+  - "Quote is for non-hazardous cargo."
+  - "Weight up to 23 tonnes per container. Between 23 and 27 tonnes add EUR 200 + fuel per container."
+  - "Consignees in the UK and Europe must have an EORI number to process through customs."
+  - "Any additional charges levied by liners, carriers or customs will be passed on, before or after delivery."
+  - "By accepting the quote you agree that any additional shipping line charges will also be paid by you (e.g. container damage, cleaning or maintenance fees)."
+  - "If we are charged any taxes by customs for this import, the consignee, shipper or agent must pay those charges immediately."
+country_terms:
+  DE:
+    - "Duty has to be confirmed by customs. Import VAT 19% (Germany). Deferment 3.5% (minimum EUR 50) of the duty and VAT amount is additional."
+  FR:
+    - "Duty has to be confirmed by customs. French import VAT applies. Deferment 3.5% (minimum EUR 50) of the duty and VAT amount is additional."
+ddp_terms:
+  - "DDP: we need an indemnity from the shipper, the consignee and your company confirming that if we are taxed by the tax office on this shipment, even 2-3 years later, one of you will pay. Confirmation is needed from all three parties; otherwise we cannot handle DDP."

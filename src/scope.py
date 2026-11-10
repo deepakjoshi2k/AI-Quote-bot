@@ -4,7 +4,8 @@ Agreed rules (Nov 2026):
 - The quote always goes to, and is charged to, the sender, whatever the Incoterm
   (the Incoterm is between buyer and seller).
 - Lincoln Cargo does not quote ocean freight or origin charges for imports.
-- Included: destination terminal handling + release fee, and delivery to the door if asked.
+- Included: destination terminal handling + release fee, and delivery to the door. Lincoln Cargo
+  always delivers (it's where they make their margin) unless the sender says they don't want it.
 - Import customs clearance: only if the email asks for it. "Clearance only" means just that.
 - Duties and import VAT are never included (at cost).
 """
@@ -26,7 +27,7 @@ def quote_scope(e: Enquiry) -> ChargeSections:
         origin_pickup=False, origin_export_clearance=False, origin_handling=False, ocean_freight=False,
         destination_handling=True,
         import_clearance=e.customs_clearance_requested is True,
-        delivery=e.delivery_required is True,
+        delivery=e.delivery_required is not False,
     )
 
 

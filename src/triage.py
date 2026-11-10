@@ -15,6 +15,7 @@ from src.config import load_config
 from src.models import ChargeSections, Direction, Enquiry, Incoterm, Mode, Service, Triage, TriageFlag
 from src.rates import RateBook, load_rate_book
 from src.scope import clearance_note, quote_scope
+from src.tariff import tariff_for
 from src.zones import MANUAL, zone_for_address
 
 
@@ -76,11 +77,16 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
                  if e.destination_country in (None, "GB") else "an island / outermost region")
         block(TriageFlag.MANUAL_DELIVERY_AREA, f"Delivery to {e.delivery_postcode} ({where}) needs a manual quote.")
 
-    # 4. Destination port and delivery must be in our rate sheets.
-    if scope.destination_handling and e.destination_port and e.destination_port not in rb.destination_ports():
+    # 4. Destination port and delivery must be in our rate sheets (tariff countries: any port in the country).
+    tariff = tariff_for(e.destination_country)
+    if tariff:
+        if scope.destination_handling and e.destination_port and not e.destination_port.startswith(e.destination_country):
+            block(TriageFlag.DESTINATION_PORT_NOT_IN_SHEET,
+                  f"Arrival port {e.destination_port} is not in {e.destination_country}: quote manually.")
+    elif scope.destination_handling and e.destination_port and e.destination_port not in rb.destination_ports():
         block(TriageFlag.DESTINATION_PORT_NOT_IN_SHEET,
               f"Arrival port {e.destination_port} is not in our rate sheet: quote manually or add its rates.")
-    if (scope.delivery and e.destination_country not in (None, "GB") and e.destination_port
+    if (not tariff and scope.delivery and e.destination_country not in (None, "GB") and e.destination_port
             and e.service is Service.FCL and e.delivery_postcode):
         zone = zone_for_address(e.destination_country, e.delivery_postcode)
         if zone and zone != MANUAL and not rb.has_eu_delivery(e.destination_port, e.destination_country, zone, e.service):
@@ -102,8 +108,14 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
     if note:
         info.append(note)
     if e.incoterm is Incoterm.DDP:
-        info.append("DDP: the seller pays import duty and VAT. Duty/VAT are not in this quote; agree how they are paid.")
-    if e.destination_country not in (None, "GB"):
+        info.append("DDP: the seller pays import duty and VAT. Duty/VAT are not in this quote; agree how they are paid."
+                    + (" We need a signed indemnity from shipper, consignee and sender's company (in the quote terms)."
+                       if tariff else ""))
+    if tariff:
+        info.append(f"Priced from: {tariff['name']} ({tariff['currency']}, same charges at every port).")
+        if "Road haulage" in " ".join(tariff.get("terms", [])):
+            info.append("Road haulage is a fixed rate for now: check it for this delivery distance.")
+    elif e.destination_country not in (None, "GB"):
         info.append(f"EU import ({e.destination_country}): customs via an EU customs partner; "
                     "duties and import VAT at cost. Confirm process with Lincoln Cargo.")
     return reasons, flags, info
@@ -113,6 +125,7 @@ def _missing_fields(e: Enquiry, scope: ChargeSections) -> tuple[list[str], list[
     """Returns (required, optional) questions for the sender."""
     req: list[str] = []
     opt: list[str] = []
+    tariff = tariff_for(e.destination_country)
 
     if e.destination_country is None and e.direction is Direction.UNKNOWN:
         req.append("delivery country (where the goods are being imported to)")
@@ -125,11 +138,12 @@ def _missing_fields(e: Enquiry, scope: ChargeSections) -> tuple[list[str], list[
         if not e.containers:
             req.append("container size and number (20GP / 40GP / 40HC)")
         if scope.destination_handling and e.destination_port is None:
-            req.append("port of arrival (discharge port)")
-        if e.delivery_required is True and not e.delivery_postcode:
+            # Tariff countries charge the same at every port: the port doesn't change the price.
+            (opt if tariff else req).append("port of arrival (discharge port)")
+        if scope.delivery and not e.delivery_postcode:
             req.append("delivery address and postcode")
-        elif e.delivery_required is None:
-            opt.append("do you need delivery to the final address? If so, the address and postcode")
+        if tariff and scope.delivery and e.total_gross_weight_kg is None:
+            opt.append(f"gross weight per container (surcharge over {tariff['heavy_over_kg'] / 1000:g} t)")
 
     if e.incoterm is Incoterm.UNKNOWN:
         opt.append("Incoterm (e.g. FOB, CIF, DAP)")

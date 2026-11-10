@@ -167,6 +167,8 @@ class Quote(BaseModel):
     validity_days: int
     assumptions: list[str] = Field(default_factory=list)
     exclusions: list[str]                  # always includes duties & import VAT
+    terms: list[str] = Field(default_factory=list)   # tariff terms & conditions printed on the quote
+    source: str = ""                       # which rate data priced it
     is_mock: bool = True
 
 
