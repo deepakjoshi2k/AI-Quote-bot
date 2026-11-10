@@ -22,7 +22,7 @@
     "destination_country": "GB"
   },
   "I02": {
-    "status": "need_info",
+    "status": "manual_review",
     "direction": "import",
     "mode": "sea",
     "service": "lcl",
@@ -35,12 +35,10 @@
     "delivery_required": true,
     "delivery_postcode": "SL3 0HJ",
     "zone": "1",
-    "flags": [],
-    "destination_country": "GB",
-    "missing_contains": [
-      "port of loading",
-      "port of arrival"
-    ]
+    "flags": [
+      "lcl_manual"
+    ],
+    "destination_country": "GB"
   },
   "I03": {
     "status": "quote",
@@ -70,17 +68,15 @@
     "origin_country": "VN",
     "origin_port": null,
     "incoterm": "UNKNOWN",
+    "flags": [],
+    "destination_country": "GB",
     "missing_contains": [
       "container size",
-      "port of loading",
+      "port of arrival",
       "commodity",
       "Incoterm",
-      "delivery postcode",
-      "ready date",
-      "hazardous"
-    ],
-    "flags": [],
-    "destination_country": "GB"
+      "delivery"
+    ]
   },
   "I05": {
     "status": "manual_review",
@@ -94,12 +90,13 @@
     "un_number": "UN3480",
     "delivery_postcode": "RG2 0QX",
     "flags": [
-      "dangerous_goods"
+      "dangerous_goods",
+      "lcl_manual"
     ],
     "destination_country": "GB"
   },
   "I06": {
-    "status": "manual_review",
+    "status": "quote",
     "direction": "import",
     "mode": "sea",
     "service": "fcl",
@@ -115,7 +112,6 @@
     "delivery_postcode": "BS2 0XS",
     "zone": "3",
     "flags": [
-      "lane_not_in_sheet",
       "port_health"
     ],
     "destination_country": "GB"
@@ -161,7 +157,7 @@
     "destination_country": "AE"
   },
   "I10": {
-    "status": "quote",
+    "status": "manual_review",
     "direction": "import",
     "mode": "sea",
     "service": "lcl",
@@ -174,11 +170,13 @@
     "delivery_required": true,
     "delivery_postcode": "RG2 0QX",
     "zone": "2",
-    "flags": [],
+    "flags": [
+      "lcl_manual"
+    ],
     "destination_country": "GB"
   },
   "I11": {
-    "status": "quote",
+    "status": "manual_review",
     "direction": "import",
     "mode": "sea",
     "service": "lcl",
@@ -191,7 +189,9 @@
     "delivery_required": true,
     "delivery_postcode": "B6 7JH",
     "zone": "2",
-    "flags": [],
+    "flags": [
+      "lcl_manual"
+    ],
     "destination_country": "GB"
   },
   "I12": {
@@ -216,11 +216,7 @@
     "destination_port": null,
     "zone": "2",
     "missing_contains": [
-      "importer",
-      "port of arrival",
-      "port of loading",
-      "ready date",
-      "hazardous"
+      "port of arrival"
     ]
   }
 }

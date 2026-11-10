@@ -27,17 +27,17 @@ def test_normalise_container_type(raw, expected):
 
 @pytest.mark.parametrize("raw, expected", [
     ("FOB", Incoterm.FOB), ("fob", Incoterm.FOB), ("FOB Ningbo", Incoterm.FOB), ("Ex Works", Incoterm.EXW),
-    ("EXW", Incoterm.EXW), ("D.A.P.", Incoterm.DAP), (None, Incoterm.UNKNOWN), ("CPT", Incoterm.UNKNOWN),
+    ("EXW", Incoterm.EXW), ("D.A.P.", Incoterm.DAP), (None, Incoterm.UNKNOWN), ("CPT", Incoterm.CPT),
     ("Free on board Ningbo", Incoterm.FOB), ("cost, insurance and freight", Incoterm.CIF), ("C&F", Incoterm.CFR),
-    ("Delivered at Place Unloaded", Incoterm.UNKNOWN), ("something else", Incoterm.UNKNOWN), ("FOBX", Incoterm.UNKNOWN),
+    ("Delivered at Place Unloaded", Incoterm.DPU), ("something else", Incoterm.UNKNOWN), ("FOBX", Incoterm.UNKNOWN),
 ])
 def test_normalise_incoterm(raw, expected):
     assert normalise_incoterm(raw)[0] is expected
 
 
-def test_unsupported_incoterm_noted():
-    term, note = normalise_incoterm("CIP")
-    assert term is Incoterm.UNKNOWN and "unsupported" in note
+def test_all_eleven_incoterms_recognised():
+    for code in ["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]:
+        assert normalise_incoterm(code) == (Incoterm(code), None)
 
 
 # ---------- units ----------

@@ -1,13 +1,15 @@
+"""Triage for the import quote agent: destination services, charged to whoever emails (src/scope.py)."""
 import pytest
 
-from src.extract import apply_defaults, extract_enquiry, normalise
+from src.extract import extract_enquiry, normalise
 from src.models import ContainerLine, Enquiry, Incoterm, RawEnquiry, Service, TriageFlag
+from src.scope import describe_scope, quote_scope
 from src.triage import triage
 from src.zones import zone_for_address
 from tests.conftest import SAMPLE_IDS, sample_text
 
 
-# ---------- all 11 sample enquiries, end to end with the fake LLM ----------
+# ---------- all sample enquiries, end to end with the fake LLM ----------
 
 @pytest.mark.parametrize("sid", SAMPLE_IDS)
 def test_sample_enquiry(sid, fake_llm, expected):
@@ -17,7 +19,6 @@ def test_sample_enquiry(sid, fake_llm, expected):
 
     assert t.status == exp["status"], t.reasons + t.missing_fields
     assert sorted(f.value for f in t.flags) == sorted(exp["flags"])
-
     for field in ["direction", "mode", "service", "origin_port", "destination_port", "incoterm", "un_number",
                   "delivery_required", "delivery_postcode", "pallets", "hazardous", "origin_country",
                   "destination_country"]:
@@ -29,172 +30,199 @@ def test_sample_enquiry(sid, fake_llm, expected):
             assert getattr(e, field) == pytest.approx(exp[field]), field
     if "containers" in exp:
         assert [c.model_dump() for c in e.containers] == exp["containers"]
-    if "ready_date" in exp:
-        assert e.ready_date.isoformat() == exp["ready_date"]
     if "zone" in exp:
         assert zone_for_address(e.destination_country, e.delivery_postcode) == exp["zone"]
     for phrase in exp.get("missing_contains", []):
         assert any(phrase.lower() in m.lower() for m in t.missing_fields), f"missing '{phrase}' in {t.missing_fields}"
 
 
-def test_quote_has_no_missing_required(fake_llm):
-    t = triage(extract_enquiry(sample_text("I01"), llm=fake_llm))
-    assert t.status == "quote" and t.missing_fields == []
+# ---------- quote scope: what goes in the quote ----------
 
-
-def test_dg_reason_mentions_sds(fake_llm):
-    t = triage(extract_enquiry(sample_text("I05"), llm=fake_llm))
-    assert any("SDS" in r for r in t.reasons)
-
-
-def test_lane_reason_names_lane(fake_llm):
-    t = triage(extract_enquiry(sample_text("I06"), llm=fake_llm))
-    assert any("BRSSZ" in r for r in t.reasons)
-    assert any("port health" in r for r in t.reasons)
-
-
-# ---------- focused rules ----------
-
-def _quotable(**overrides) -> Enquiry:
-    """An LCL FOB Shanghai -> Felixstowe enquiry that triages to 'quote'."""
-    base = dict(direction="import", mode="sea", service=Service.LCL, origin_port="CNSHA", destination_port="GBFXT",
-                total_volume_cbm=2.0, total_gross_weight_kg=500, commodity="toys", hazardous=False,
-                incoterm=Incoterm.FOB, delivery_required=True, delivery_postcode="SL1 4QP",
-                ready_date="2026-12-01")
+def _fcl(**overrides) -> Enquiry:
+    """FCL import to Felixstowe, delivered in Slough: quotable."""
+    base = dict(direction="import", mode="sea", service=Service.FCL, destination_country="GB",
+                destination_port="GBFXT", containers=[ContainerLine(container_type="40HC", quantity=1)],
+                commodity="furniture", incoterm=Incoterm.FOB, delivery_required=True, delivery_postcode="SL1 4QP")
     base.update(overrides)
     return Enquiry(**base)
 
 
 def test_baseline_is_quote():
-    assert triage(_quotable()).status == "quote"
+    t = triage(_fcl())
+    assert t.status == "quote" and t.missing_fields == []
+
+
+def test_scope_default_is_terminal_handling_and_delivery():
+    assert describe_scope(quote_scope(_fcl())) == ["Destination terminal handling + release fee",
+                                                   "Delivery to the final address"]
+
+
+def test_scope_never_includes_freight_or_origin():
+    s = quote_scope(_fcl(incoterm=Incoterm.EXW))
+    assert not (s.ocean_freight or s.origin_pickup or s.origin_handling or s.origin_export_clearance)
+
+
+def test_clearance_only_when_asked():
+    assert not quote_scope(_fcl()).import_clearance
+    assert quote_scope(_fcl(customs_clearance_requested=True)).import_clearance
+
+
+def test_clearance_only_enquiry():
+    e = _fcl(clearance_only=True, customs_clearance_requested=True, delivery_required=False, destination_port=None)
+    assert describe_scope(quote_scope(e)) == ["Import customs clearance"]
+    assert triage(e).status == "quote"          # no port or delivery needed for a customs-only quote
+
+
+def test_no_delivery_when_not_asked():
+    assert not quote_scope(_fcl(delivery_required=False)).delivery
+
+
+# ---------- same quote whatever the Incoterm (sender always pays) ----------
+
+@pytest.mark.parametrize("term", ["EXW", "FCA", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS"])
+def test_every_incoterm_is_quotable(term):
+    assert triage(_fcl(incoterm=Incoterm(term))).status == "quote"
+
+
+@pytest.mark.parametrize("term", ["DAP", "DPU"])
+def test_dap_dpu_clearance_note(term):
+    t = triage(_fcl(incoterm=Incoterm(term)))
+    assert any("Email the importer" in r for r in t.reasons)
+
+
+def test_dap_note_not_added_when_clearance_requested():
+    t = triage(_fcl(incoterm=Incoterm.DAP, customs_clearance_requested=True))
+    assert not any("Email the importer" in r for r in t.reasons)
+
+
+def test_ddp_quoted_with_duty_note():
+    t = triage(_fcl(incoterm=Incoterm.DDP))
+    assert t.status == "quote" and any("DDP" in r for r in t.reasons)
+
+
+def test_missing_incoterm_does_not_block():
+    t = triage(_fcl(incoterm=Incoterm.UNKNOWN))
+    assert t.status == "quote" and any("Incoterm" in m for m in t.missing_fields)
+
+
+def test_role_is_ignored():
+    for role in ["buyer", "seller", "agent", "unknown"]:
+        assert triage(_fcl(customer_role=role, incoterm=Incoterm.DAP)).status == "quote"
+
+
+# ---------- not relevant / not asked ----------
+
+def test_no_questions_about_origin_ready_date_or_hazard():
+    t = triage(_fcl(commodity=None))
+    joined = " ".join(t.missing_fields).lower()
+    assert "origin" not in joined and "ready" not in joined and "hazard" not in joined
+
+
+def test_hazard_not_stated_is_non_hazardous():
+    assert triage(_fcl(hazardous=None)).status == "quote"
+
+
+# ---------- manual review ----------
+
+def test_lcl_is_manual():
+    t = triage(_fcl(service=Service.LCL, containers=[], total_volume_cbm=3))
+    assert t.status == "manual_review" and TriageFlag.LCL_MANUAL in t.flags
+
+
+def test_dg_keyword_without_flag():
+    assert TriageFlag.DANGEROUS_GOODS in triage(_fcl(commodity="aerosol paint cans")).flags
+
+
+def test_car_parts_are_not_vehicles():
+    assert triage(_fcl(commodity="car parts")).status == "quote"
+
+
+def test_reefer_is_special():
+    assert TriageFlag.SPECIAL_CARGO in triage(_fcl(special_requirements=["reefer"])).flags
 
 
 def test_northern_ireland_delivery_is_manual():
-    t = triage(_quotable(delivery_postcode="BT1 1AA"))
+    t = triage(_fcl(delivery_postcode="BT1 1AA"))
     assert t.status == "manual_review" and TriageFlag.MANUAL_DELIVERY_AREA in t.flags
 
 
 def test_ni_postcode_ignored_when_no_delivery():
-    assert triage(_quotable(delivery_postcode="BT1 1AA", delivery_required=False)).status == "quote"
+    assert triage(_fcl(delivery_postcode="BT1 1AA", delivery_required=False)).status == "quote"
 
 
-def test_ddp_is_manual():
-    assert TriageFlag.DDP in triage(_quotable(incoterm=Incoterm.DDP)).flags
+def test_port_not_in_sheet():
+    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in triage(_fcl(destination_port="GBLIV")).flags
 
 
-def test_dg_keyword_without_flag():
-    t = triage(_quotable(commodity="aerosol paint cans", hazardous=None))
-    assert TriageFlag.DANGEROUS_GOODS in t.flags
-
-
-def test_car_parts_are_not_vehicles():
-    assert triage(_quotable(commodity="car parts")).status == "quote"
-
-
-def test_reefer_is_special():
-    t = triage(_quotable(special_requirements=["reefer"]))
-    assert TriageFlag.SPECIAL_CARGO in t.flags
-
-
-def test_heavy_20gp_flagged():
-    e = _quotable(service=Service.FCL, origin_port="CNNGB", total_gross_weight_kg=24000,
-                  containers=[ContainerLine(container_type="20GP", quantity=1)])
-    assert TriageFlag.HEAVY_CONTAINER in triage(e).flags
-
-
-def test_container_type_not_in_sheet():
-    e = _quotable(service=Service.FCL, containers=[ContainerLine(container_type="40GP", quantity=1)])
-    t = triage(e)  # Shanghai has no 40GP rate
-    assert t.status == "manual_review" and TriageFlag.LANE_NOT_IN_SHEET in t.flags
-
-
-def test_destination_port_not_in_sheet():
-    t = triage(_quotable(destination_port="GBLIV"))
-    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in t.flags
-
-
-def test_unsupported_incoterm_goes_manual():
-    e = apply_defaults(normalise(RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai",
-                                            total_volume_cbm=2, total_weight=500, commodity="toys", incoterm="CPT")))
-    assert triage(e).status == "manual_review"
-
-
-def test_lcl_missing_weight():
-    t = triage(_quotable(total_gross_weight_kg=None))
-    assert t.status == "need_info" and any("weight" in m for m in t.missing_fields)
-
-
-def test_mid_volume_asks_fcl_or_lcl():
-    t = triage(_quotable(service=Service.UNKNOWN, total_volume_cbm=14))
-    assert any("both could work" in m for m in t.missing_fields)
-
-
-def test_missing_incoterm_asks():
-    t = triage(_quotable(incoterm=Incoterm.UNKNOWN))
-    assert t.status == "need_info" and any("Incoterm" in m for m in t.missing_fields)
-
-
-def test_delivery_requested_without_postcode():
-    t = triage(_quotable(delivery_postcode=None))
-    assert t.status == "need_info" and "delivery postcode" in t.missing_fields
-
-
-def test_optional_fields_dont_block_quote():
-    assert triage(_quotable(ready_date=None, hazardous=None, delivery_required=False)).status == "quote"
-
-
-def test_dap_customs_only_needs_no_cargo_size():
-    e = _quotable(incoterm=Incoterm.DAP, total_volume_cbm=None, total_gross_weight_kg=None, destination_port=None,
-                  origin_port=None, service=Service.UNKNOWN, delivery_required=False)
-    assert triage(e).status == "quote"
-
-
-# ---------- Phase 3.1: direction from countries, routing, customer role ----------
-
-def test_air_enquiry_only_routes_to_air_team(fake_llm):
-    t = triage(extract_enquiry(sample_text("I08"), llm=fake_llm))
-    assert t.flags == [TriageFlag.NOT_SEA]   # no noise about Heathrow not being a sea port
+def test_export_and_air_routed():
+    assert triage(_fcl(direction="export", origin_country="GB", destination_country="AE")).flags == [TriageFlag.EXPORT]
+    assert triage(_fcl(mode="air")).flags == [TriageFlag.NOT_SEA]
 
 
 def test_air_dg_still_flagged():
-    e = _quotable(mode="air", commodity="lithium batteries")
-    assert set(triage(e).flags) == {TriageFlag.NOT_SEA, TriageFlag.DANGEROUS_GOODS}
+    assert set(triage(_fcl(mode="air", commodity="lithium batteries")).flags) == {TriageFlag.NOT_SEA,
+                                                                                TriageFlag.DANGEROUS_GOODS}
 
 
-def test_i12_france_dap_asks_instead_of_guessing(fake_llm):
-    e = extract_enquiry(sample_text("I12"), llm=fake_llm)
+def test_cross_trade_routed():
+    assert triage(_fcl(direction="cross_trade", origin_country="CN", destination_country="US")).flags == [
+        TriageFlag.CROSS_TRADE]
+
+
+def test_home_country_without_rates_routed(monkeypatch):
+    from src.config import load_config
+    cfg = dict(load_config()); cfg["home_countries"] = cfg["home_countries"] + ["NO"]
+    monkeypatch.setattr("src.triage.load_config", lambda: cfg)
+    t = triage(_fcl(destination_country="NO", delivery_postcode="0150"))
+    assert t.flags == [TriageFlag.DESTINATION_NOT_PRICED]
+
+
+# ---------- warnings never block ----------
+
+def test_heavy_container_does_not_block_quote():
+    e = _fcl(total_gross_weight_kg=24000, containers=[ContainerLine(container_type="20GP", quantity=1)])
     t = triage(e)
-    assert e.destination_port is None and e.origin_country is None   # nothing assumed
-    assert t.status == "need_info"
-    assert any("importer" in m for m in t.missing_fields)
-    assert any("port of arrival" in m for m in t.missing_fields)
-    assert TriageFlag.HEAVY_CONTAINER in t.flags                       # warning, not a blocker
+    assert t.status == "quote" and TriageFlag.HEAVY_CONTAINER in t.flags
 
 
-# ---------- EU destinations ----------
+def test_port_health_note(fake_llm):
+    t = triage(extract_enquiry(sample_text("I06"), llm=fake_llm))
+    assert t.status == "quote" and any("port health" in r for r in t.reasons)
+
+
+# ---------- need_info ----------
+
+def test_port_of_arrival_asked():
+    t = triage(_fcl(destination_port=None))
+    assert t.status == "need_info" and any("port of arrival" in m for m in t.missing_fields)
+
+
+def test_container_size_asked():
+    t = triage(_fcl(containers=[]))
+    assert t.status == "need_info" and any("container size" in m for m in t.missing_fields)
+
+
+def test_delivery_requested_without_postcode():
+    t = triage(_fcl(delivery_postcode=None))
+    assert t.status == "need_info" and any("postcode" in m for m in t.missing_fields)
+
+
+def test_delivery_not_mentioned_is_side_question():
+    t = triage(_fcl(delivery_required=None, delivery_postcode=None))
+    assert t.status == "quote" and any("delivery" in m for m in t.missing_fields)
+
+
+# ---------- EU ----------
 
 def _eu(**overrides) -> Enquiry:
-    """LCL FOB Shanghai -> Hamburg, delivered in Germany: should be quotable."""
     base = dict(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095")
     base.update(overrides)
-    return _quotable(**base)
+    return _fcl(**base)
 
 
-def test_eu_import_quotable():
+def test_eu_import_quotable_with_note():
     t = triage(_eu())
-    assert t.status == "quote", t.reasons
-    assert any("EU EORI" in r for r in t.reasons)
-
-
-def test_eu_port_not_written_is_asked():
-    raw = RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai",
-                     destination_country="FR", delivery_postcode="51300", total_volume_cbm=2, total_weight=400,
-                     commodity="toys", incoterm="FOB", delivery_required=True, hazardous=False, customer_role="buyer",
-                     ready_date="2026-12-01")
-    e = apply_defaults(normalise(raw))
-    t = triage(e)
-    assert e.destination_port is None
-    assert t.status == "need_info" and any("port of arrival" in m for m in t.missing_fields)
+    assert t.status == "quote" and any("EU import" in r for r in t.reasons)
 
 
 def test_eu_island_is_manual():
@@ -203,18 +231,12 @@ def test_eu_island_is_manual():
 
 
 def test_eu_port_without_delivery_rate_to_country():
-    t = triage(_eu(destination_port="NLRTM"))   # Rotterdam -> Germany delivery not in the sheet
+    t = triage(_eu(destination_port="NLRTM"))
     assert t.status == "manual_review" and TriageFlag.LANE_NOT_IN_SHEET in t.flags
 
 
 def test_eu_port_not_priced():
-    t = triage(_eu(destination_port="DEBRV"))
-    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in t.flags
-
-
-def test_eu_missing_postcode_asks():
-    t = triage(_eu(delivery_postcode=None))
-    assert t.status == "need_info" and "delivery postcode" in t.missing_fields
+    assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in triage(_eu(destination_port="DEBRV")).flags
 
 
 def test_eu_port_name_sets_country():
@@ -222,59 +244,31 @@ def test_eu_port_name_sets_country():
     assert e.destination_country == "NL" and e.destination_port == "NLRTM"
 
 
-def test_home_country_without_rates_routed(monkeypatch):
-    from src.config import load_config
-    cfg = dict(load_config()); cfg["home_countries"] = cfg["home_countries"] + ["NO"]
-    monkeypatch.setattr("src.triage.load_config", lambda: cfg)
-    t = triage(_quotable(destination_country="NO", delivery_postcode="0150"))
-    assert t.flags == [TriageFlag.DESTINATION_NOT_PRICED]
+# ---------- the France DAP email (I12) ----------
 
-
-def test_seller_asking_is_manual():
-    t = triage(_quotable(customer_role="seller"))
-    assert t.status == "manual_review" and TriageFlag.CUSTOMER_NOT_BUYER in t.flags
-
-
-def test_unknown_role_treated_as_importer():
-    assert triage(_quotable(customer_role="unknown")).status == "quote"
-
-
-def test_cross_trade_routed():
-    e = _quotable(direction="cross_trade", origin_country="CN", destination_country="US")
-    assert triage(e).flags == [TriageFlag.CROSS_TRADE]
-
-
-# ---------- seller-side cue that doesn't depend on the model ----------
-
-@pytest.mark.parametrize("role", ["buyer", "unknown"])
-def test_dap_with_delivery_request_asks_who_they_are(role):
-    t = triage(_quotable(incoterm=Incoterm.DAP, delivery_required=True, customer_role=role))
-    assert t.status == "need_info"
-    assert any("importer (buyer), the supplier" in m for m in t.missing_fields)
-
-
-def test_stated_seller_still_manual():
-    t = triage(_quotable(customer_role="seller"))
-    assert t.status == "manual_review" and TriageFlag.CUSTOMER_NOT_BUYER in t.flags
-
-
-def test_dap_clearance_only_still_quotes():
-    # I07 pattern: DAP, importer only wants customs clearance
-    assert triage(_quotable(incoterm=Incoterm.DAP, delivery_required=False)).status == "quote"
-
-
-def test_heavy_container_does_not_block_quote():
-    e = _quotable(service=Service.FCL, origin_port="CNNGB", total_gross_weight_kg=24000,
-                  containers=[ContainerLine(container_type="20GP", quantity=1)])
+def test_i12_france_dap(fake_llm):
+    e = extract_enquiry(sample_text("I12"), llm=fake_llm)
     t = triage(e)
-    assert t.status == "quote" and TriageFlag.HEAVY_CONTAINER in t.flags
+    assert e.destination_port is None and e.origin_country is None   # nothing assumed
+    assert t.status == "need_info"
+    assert t.missing_fields == ["port of arrival (discharge port)"]
+    assert any("Email the importer" in r for r in t.reasons)
+    assert TriageFlag.HEAVY_CONTAINER in t.flags
+
+
+# ---------- clearance flags from the email ----------
+
+def test_clearance_only_from_email(fake_llm):
+    e = extract_enquiry(sample_text("I07"), llm=fake_llm)
+    assert e.clearance_only and e.customs_clearance_requested and e.delivery_required is False
+    assert describe_scope(quote_scope(e)) == ["Import customs clearance"]
 
 
 # ---------- readable report ----------
 
-def test_report_shows_not_available(fake_llm):
+def test_report_relevance(fake_llm):
     from src.report import format_result
     e = extract_enquiry(sample_text("I12"), llm=fake_llm)
     out = format_result(e, triage(e))
-    assert "Port of arrival" in out and "Not available" in out
-    assert "ASK THE SENDER" in out and "FRLEH" not in out
+    assert "Not relevant" in out and "No (not stated)" in out and "FRLEH" not in out
+    assert "QUOTE WILL INCLUDE" in out

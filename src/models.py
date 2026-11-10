@@ -46,6 +46,10 @@ class Incoterm(str, Enum):
     CIF = "CIF"
     DAP = "DAP"
     DDP = "DDP"
+    CPT = "CPT"
+    CIP = "CIP"
+    DPU = "DPU"
+    FAS = "FAS"
     UNKNOWN = "UNKNOWN"
 
 
@@ -91,6 +95,8 @@ class Enquiry(BaseModel):
     incoterm: Incoterm = Incoterm.UNKNOWN
     incoterm_place: str | None = None      # e.g. "Ningbo", "supplier premises"
     delivery_required: bool | None = None
+    customs_clearance_requested: bool | None = None  # sender asks us to clear import customs
+    clearance_only: bool | None = None               # sender wants ONLY customs clearance
     delivery_postcode: str | None = None   # normalised if UK, as written otherwise
     delivery_place: str | None = None      # town / address as written
     ready_date: date | None = None
@@ -110,7 +116,8 @@ class TriageFlag(str, Enum):
     LANE_NOT_IN_SHEET = "lane_not_in_sheet"
     DESTINATION_PORT_NOT_IN_SHEET = "destination_port_not_in_sheet"
     MANUAL_DELIVERY_AREA = "manual_delivery_area"
-    HEAVY_CONTAINER = "heavy_container"
+    HEAVY_CONTAINER = "heavy_container"     # warning only
+    LCL_MANUAL = "lcl_manual"               # LCL is quoted by hand for now
     PORT_HEALTH = "port_health"          # informational only, does not block a quote
 
 
@@ -206,6 +213,8 @@ class RawEnquiry(BaseModel):
     incoterm: str | None = None            # as written, e.g. "FOB"
     incoterm_place: str | None = None
     delivery_required: bool | None = None
+    customs_clearance_requested: bool | None = None
+    clearance_only: bool | None = None
     delivery_postcode: str | None = None
     delivery_place: str | None = None
     ready_date: date | None = None

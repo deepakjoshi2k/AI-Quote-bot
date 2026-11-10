@@ -1,9 +1,15 @@
-"""Human-readable view of an extracted enquiry + triage. Empty fields show as "Not available"."""
+"""Human-readable view of an import enquiry + triage.
+
+"Not available" = needed but not in the email (asked of the sender if it matters).
+"Not relevant"  = not used for Lincoln Cargo's import quote (destination services, charged to the sender).
+"""
 from __future__ import annotations
 
-from src.models import Enquiry, Triage
+from src.models import Enquiry, Service, Triage
+from src.scope import describe_scope, quote_scope
 
 NA = "Not available"
+NR = "Not relevant"
 
 
 def _v(value) -> str:
@@ -19,41 +25,56 @@ def _v(value) -> str:
 
 
 def enquiry_rows(e: Enquiry) -> list[tuple[str, str]]:
+    fcl = e.service is Service.FCL
     containers = ", ".join(f"{c.quantity} x {c.container_type}" for c in e.containers) or None
     cartons = f"{sum(c.quantity for c in e.cartons)} cartons" if e.cartons else None
+    if e.hazardous is None and not e.un_number:
+        hazardous = "No (not stated)"
+    else:
+        hazardous = _v(e.hazardous) + (f" ({e.un_number})" if e.un_number else "")
+    clearance = ("yes (customs clearance only)" if e.clearance_only
+                 else _v(e.customs_clearance_requested) if e.customs_clearance_requested is not None
+                 else "not asked")
     return [
         ("Sender", _v(e.customer_name)),
-        ("Sender's role", _v(e.customer_role)),
+        ("Sender's role", NR),
         ("Direction (from countries)", _v(e.direction)),
         ("Mode", _v(e.mode)),
         ("Service", _v(e.service)),
-        ("Origin country", _v(e.origin_country)),
-        ("Supplier / origin place", _v(e.origin_place)),
-        ("Port of loading", _v(e.origin_port or e.origin_port_name)),
+        ("Origin country", NR),
+        ("Supplier / origin place", NR),
+        ("Port of loading", NR),
         ("Destination country", _v(e.destination_country)),
         ("Port of arrival", _v(e.destination_port)),
         ("Containers", _v(containers)),
-        ("Cartons", _v(cartons)),
-        ("Volume (CBM)", _v(e.total_volume_cbm)),
+        ("Cartons", NR if fcl else _v(cartons)),
+        ("Volume (CBM)", NR + " (FCL is priced per container)" if fcl else _v(e.total_volume_cbm)),
         ("Gross weight (kg)", _v(e.total_gross_weight_kg)),
-        ("Pallets", _v(e.pallets)),
+        ("Pallets", NR if fcl else _v(e.pallets)),
         ("Commodity", _v(e.commodity)),
-        ("Hazardous", _v(e.hazardous) + (f" ({e.un_number})" if e.un_number else "")),
-        ("Incoterm", _v(e.incoterm) + (f" {e.incoterm_place}" if e.incoterm_place else "")),
+        ("Hazardous", hazardous),
+        ("Incoterm", _v(e.incoterm)),
         ("Delivery by us", _v(e.delivery_required)),
         ("Delivery address", _v(", ".join(filter(None, [e.delivery_place, e.delivery_postcode])))),
-        ("Cargo ready date", _v(e.ready_date)),
+        ("Customs clearance by us", clearance),
+        ("Cargo ready date", NR),
     ]
 
 
 def format_result(e: Enquiry, t: Triage) -> str:
-    width = max(len(k) for k, _ in enquiry_rows(e))
+    rows = enquiry_rows(e)
+    width = max(len(k) for k, _ in rows)
     lines = ["=== SHIPMENT DETAILS ==="]
-    lines += [f"  {k:<{width}}  {v}" for k, v in enquiry_rows(e)]
+    lines += [f"  {k:<{width}}  {v}" for k, v in rows]
     lines += ["", f"=== DECISION: {t.status.upper()} ==="]
     lines += [f"  - {r}" for r in t.reasons] or ["  (no warnings)"]
+    if t.status != "manual_review":
+        lines += ["", "=== QUOTE WILL INCLUDE ==="]
+        lines += [f"  - {item}" for item in describe_scope(quote_scope(e))]
+        lines += ["  (Duties and import VAT: not included, at cost)"]
     if t.missing_fields:
-        lines += ["", "=== ASK THE SENDER ==="]
+        title = "ASK THE SENDER" if t.status == "need_info" else "ALSO ASK (does not block the quote)"
+        lines += ["", f"=== {title} ==="]
         lines += [f"  {i}. {m[0].upper() + m[1:]}" for i, m in enumerate(t.missing_fields, 1)]
     if e.extraction_notes:
         lines += ["", "=== NOTES ==="] + [f"  - {n}" for n in e.extraction_notes]
