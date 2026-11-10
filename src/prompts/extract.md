@@ -22,6 +22,8 @@ Copy what the email says into the JSON fields below. **Do not calculate anything
 - `destination_port_name`: the arrival port only if written ("to Felixstowe", "via Felixstowe", "Rotterdam"). Never choose or suggest a port, even if asked "advise nearest POD". Otherwise `null`.
 - `incoterm`: the term exactly as written (EXW, FCA, FOB, CFR, CIF, CPT, CIP, DAP, DPU, DDP), or `null`. `incoterm_place`: the place written with it ("FOB Ningbo" → "Ningbo").
 - `delivery_required`: true only if the writer asks **us** to deliver to the final address (door to door, "deliver to our warehouse", "door delivery to address above"). false if someone else delivers ("our supplier is delivering to us"), if they will collect, or if they only want clearance/freight. `null` if not written.
+- `customs_clearance_requested`: true if the writer asks us to handle import customs clearance ("customs clearance", "clear customs", "incl. customs"); false if they say they will clear it themselves; otherwise `null`.
+- `clearance_only`: true only if the writer says they want ONLY customs clearance from us ("we just need you to handle the customs clearance"); otherwise `null`.
 - `delivery_postcode`: the postcode of the delivery address exactly as written (any country). `delivery_place`: delivery town and country as written.
 - `hazardous`: true if the email says hazardous/dangerous or gives a UN number; false only if it explicitly says not hazardous; otherwise `null`. `un_number`: e.g. "UN3480".
 - `special_requirements`: short phrases only for special needs that are written: "reefer", "temperature controlled", "flat rack", "open top", "out of gauge", "ISO tank", "vehicle", "tail-lift", "insurance". Empty list if none.

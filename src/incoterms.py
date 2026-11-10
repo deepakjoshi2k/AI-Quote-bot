@@ -1,4 +1,7 @@
-"""Step 4: Incoterm -> which quote sections the UK importer pays for.
+"""Incoterm -> which sections the IMPORTER pays for (trade reference).
+
+Note: Lincoln Cargo's quote is decided by src/scope.py (destination services, charged to whoever
+emails). This table is kept as trade knowledge and for notes, e.g. who clears import customs.
 
 Source of truth: 03_freight_domain_reference.md, section 4. Confirm with Lincoln Cargo before production.
 """
@@ -16,6 +19,10 @@ _TABLE: dict[Incoterm, tuple[bool, bool, bool, bool, bool, bool, bool]] = {
     Incoterm.CFR: (False, False, False, False, True,  True,  True),
     Incoterm.CIF: (False, False, False, False, True,  True,  True),
     Incoterm.DAP: (False, False, False, False, False, True,  False),
+    Incoterm.DPU: (False, False, False, False, False, True,  False),   # as DAP, seller also unloads
+    Incoterm.CPT: (False, False, False, False, True,  True,  True),    # as CFR, any mode
+    Incoterm.CIP: (False, False, False, False, True,  True,  True),    # as CIF, any mode
+    Incoterm.FAS: (False, False, True,  True,  True,  True,  True),    # alongside ship: buyer pays loading
     Incoterm.DDP: (False, False, False, False, False, False, False),
 }
 
@@ -26,7 +33,8 @@ _ASSUMPTIONS: dict[Incoterm, list[str]] = {
     ],
     Incoterm.CFR: ["Ocean freight paid by the supplier (CFR). UK terminal handling assumed for the importer's account; confirm with the carrier."],
     Incoterm.CIF: ["Ocean freight and insurance paid by the supplier (CIF). UK terminal handling assumed for the importer's account; confirm with the carrier."],
-    Incoterm.DAP: ["DAP: the supplier delivers to the importer's premises; only UK import customs clearance is quoted."],
+    Incoterm.DAP: ["DAP: the supplier delivers to the importer's premises; import customs clearance is the importer's."],
+    Incoterm.DPU: ["DPU: the supplier delivers and unloads at the importer's premises; import customs clearance is the importer's."],
 }
 
 

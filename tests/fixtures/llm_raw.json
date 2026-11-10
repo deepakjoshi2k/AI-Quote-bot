@@ -23,7 +23,8 @@
     "delivery_postcode": "SL1 4QP",
     "ready_date": "2026-11-20",
     "destination_country": "GB",
-    "customer_role": "buyer"
+    "customer_role": "buyer",
+    "customs_clearance_requested": true
   },
   "I02": {
     "customer_name": "Ahmed Khan",
@@ -44,7 +45,8 @@
     "delivery_postcode": "SL3 0HJ",
     "notes": [],
     "destination_country": "GB",
-    "customer_role": "buyer"
+    "customer_role": "buyer",
+    "customs_clearance_requested": true
   },
   "I03": {
     "customer_name": "Tom Reed",
@@ -68,7 +70,8 @@
     "delivery_required": true,
     "delivery_postcode": "LE4 9HA",
     "destination_country": "GB",
-    "customer_role": "buyer"
+    "customer_role": "buyer",
+    "customs_clearance_requested": true
   },
   "I04": {
     "customer_name": "Mark",
@@ -141,7 +144,9 @@
     "delivery_required": false,
     "delivery_postcode": "MK1 1AA",
     "destination_country": "GB",
-    "customer_role": "buyer"
+    "customer_role": "buyer",
+    "clearance_only": true,
+    "customs_clearance_requested": true
   },
   "I08": {
     "direction": "import",
@@ -194,7 +199,8 @@
     "delivery_required": true,
     "delivery_postcode": "RG2 0QX",
     "destination_country": "GB",
-    "customer_role": "buyer"
+    "customer_role": "buyer",
+    "customs_clearance_requested": true
   },
   "I11": {
     "customer_name": "Daniel Okafor",
@@ -223,7 +229,8 @@
     "delivery_required": true,
     "delivery_postcode": "B6 7JH",
     "destination_country": "GB",
-    "customer_role": "buyer"
+    "customer_role": "buyer",
+    "customs_clearance_requested": true
   },
   "I12": {
     "customer_role": "unknown",
