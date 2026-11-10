@@ -22,12 +22,12 @@
     "destination_country": "GB"
   },
   "I02": {
-    "status": "quote",
+    "status": "need_info",
     "direction": "import",
     "mode": "sea",
     "service": "lcl",
-    "origin_port": "CNSHA",
-    "destination_port": "GBFXT",
+    "origin_port": null,
+    "destination_port": null,
     "incoterm": "EXW",
     "total_volume_cbm": 4.8,
     "total_gross_weight_kg": 1450,
@@ -36,7 +36,11 @@
     "delivery_postcode": "SL3 0HJ",
     "zone": "1",
     "flags": [],
-    "destination_country": "GB"
+    "destination_country": "GB",
+    "missing_contains": [
+      "port of loading",
+      "port of arrival"
+    ]
   },
   "I03": {
     "status": "quote",
@@ -68,7 +72,7 @@
     "incoterm": "UNKNOWN",
     "missing_contains": [
       "container size",
-      "origin port",
+      "port of loading",
       "commodity",
       "Incoterm",
       "delivery postcode",
@@ -191,7 +195,7 @@
     "destination_country": "GB"
   },
   "I12": {
-    "status": "manual_review",
+    "status": "need_info",
     "direction": "import",
     "mode": "sea",
     "service": "fcl",
@@ -207,10 +211,16 @@
     "total_gross_weight_kg": 21000,
     "delivery_postcode": "51300",
     "flags": [
-      "customer_not_buyer",
       "heavy_container"
     ],
-    "destination_port": "FRLEH",
-    "zone": "2"
+    "destination_port": null,
+    "zone": "2",
+    "missing_contains": [
+      "importer",
+      "port of arrival",
+      "port of loading",
+      "ready date",
+      "hazardous"
+    ]
   }
 }

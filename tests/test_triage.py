@@ -161,10 +161,14 @@ def test_air_dg_still_flagged():
     assert set(triage(e).flags) == {TriageFlag.NOT_SEA, TriageFlag.DANGEROUS_GOODS}
 
 
-def test_i12_agent_asking_for_eu_dap_is_manual(fake_llm):
-    t = triage(extract_enquiry(sample_text("I12"), llm=fake_llm))
-    assert TriageFlag.CUSTOMER_NOT_BUYER in t.flags
-    assert any("agent" in r for r in t.reasons)
+def test_i12_france_dap_asks_instead_of_guessing(fake_llm):
+    e = extract_enquiry(sample_text("I12"), llm=fake_llm)
+    t = triage(e)
+    assert e.destination_port is None and e.origin_country is None   # nothing assumed
+    assert t.status == "need_info"
+    assert any("importer" in m for m in t.missing_fields)
+    assert any("port of arrival" in m for m in t.missing_fields)
+    assert TriageFlag.HEAVY_CONTAINER in t.flags                       # warning, not a blocker
 
 
 # ---------- EU destinations ----------
@@ -182,14 +186,15 @@ def test_eu_import_quotable():
     assert any("EU EORI" in r for r in t.reasons)
 
 
-def test_eu_default_port_filled():
+def test_eu_port_not_written_is_asked():
     raw = RawEnquiry(direction="import", mode="sea", service="lcl", origin_port_name="Shanghai",
                      destination_country="FR", delivery_postcode="51300", total_volume_cbm=2, total_weight=400,
-                     commodity="toys", incoterm="FOB", delivery_required=True, hazardous=False, customer_role="buyer")
+                     commodity="toys", incoterm="FOB", delivery_required=True, hazardous=False, customer_role="buyer",
+                     ready_date="2026-12-01")
     e = apply_defaults(normalise(raw))
-    assert e.destination_port == "FRLEH"
-    assert any("staff to confirm" in n for n in e.extraction_notes)
-    assert triage(e).status == "quote"
+    t = triage(e)
+    assert e.destination_port is None
+    assert t.status == "need_info" and any("port of arrival" in m for m in t.missing_fields)
 
 
 def test_eu_island_is_manual():
@@ -242,10 +247,15 @@ def test_cross_trade_routed():
 # ---------- seller-side cue that doesn't depend on the model ----------
 
 @pytest.mark.parametrize("role", ["buyer", "unknown"])
-def test_dap_with_delivery_request_is_seller_side(role):
+def test_dap_with_delivery_request_asks_who_they_are(role):
     t = triage(_quotable(incoterm=Incoterm.DAP, delivery_required=True, customer_role=role))
+    assert t.status == "need_info"
+    assert any("importer (buyer), the supplier" in m for m in t.missing_fields)
+
+
+def test_stated_seller_still_manual():
+    t = triage(_quotable(customer_role="seller"))
     assert t.status == "manual_review" and TriageFlag.CUSTOMER_NOT_BUYER in t.flags
-    assert any("supplier arranges delivery" in r for r in t.reasons)
 
 
 def test_dap_clearance_only_still_quotes():
@@ -253,6 +263,18 @@ def test_dap_clearance_only_still_quotes():
     assert triage(_quotable(incoterm=Incoterm.DAP, delivery_required=False)).status == "quote"
 
 
-def test_i12_caught_even_when_model_says_buyer(fake_llm):
-    t = triage(extract_enquiry(sample_text("I12"), llm=fake_llm))
-    assert TriageFlag.CUSTOMER_NOT_BUYER in t.flags
+def test_heavy_container_does_not_block_quote():
+    e = _quotable(service=Service.FCL, origin_port="CNNGB", total_gross_weight_kg=24000,
+                  containers=[ContainerLine(container_type="20GP", quantity=1)])
+    t = triage(e)
+    assert t.status == "quote" and TriageFlag.HEAVY_CONTAINER in t.flags
+
+
+# ---------- readable report ----------
+
+def test_report_shows_not_available(fake_llm):
+    from src.report import format_result
+    e = extract_enquiry(sample_text("I12"), llm=fake_llm)
+    out = format_result(e, triage(e))
+    assert "Port of arrival" in out and "Not available" in out
+    assert "ASK THE SENDER" in out and "FRLEH" not in out
