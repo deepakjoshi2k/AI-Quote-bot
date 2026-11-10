@@ -17,6 +17,9 @@ home_countries: [GB, AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT,
 
 default_uk_port: GBFXT    # used when the email names no UK port and the sheet has several
 cbm_mismatch_tolerance: 0.05   # note it if stated CBM and carton CBM differ by more than 5%
+nearest_ports:            # when the email names no arrival port (src/distance.py, OpenRouteService road distances)
+  candidates: 10          # ports pre-selected by straight line, then measured by road
+  show: 3                 # nearest ports shown to staff (+ the nearest one we can price, if not among them)
 
 # Triage keyword lists (regular expressions, case-insensitive, matched on commodity + special requirements).
 # Edit these to match Lincoln Cargo's own rules.

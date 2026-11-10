@@ -36,3 +36,14 @@ def terms_for(tariff: dict, country: str, ddp: bool) -> list[str]:
     if ddp:
         terms += tariff.get("ddp_terms", [])
     return terms
+
+
+def port_country(port: str | None) -> str | None:
+    """UN/LOCODEs start with the country code: FRLEH -> FR."""
+    return port[:2].upper() if port else None
+
+
+def pricing_tariff(port: str | None, delivery_country: str | None) -> dict | None:
+    """The tariff that prices destination handling: the ARRIVAL PORT's country (the port may be in another
+    country than the delivery, e.g. Hamburg for a delivery in France). With no port yet, the delivery country's."""
+    return tariff_for(port_country(port)) if port else tariff_for(delivery_country)

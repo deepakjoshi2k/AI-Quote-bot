@@ -13,14 +13,15 @@ Amounts are kept exact and rounded to 2 dp only at the end.
 from __future__ import annotations
 
 from src.config import load_config
+from src.distance import port_names
 from src.models import Enquiry, Quote, QuoteLine, Service
 from src.rates import RateBook, delivery_rate, destination_charge, load_rate_book
 from src.haulage import HaulageCheck, carrier_haulage
 from src.scope import quote_scope
-from src.tariff import tariff_for, terms_for
+from src.tariff import port_country, pricing_tariff, tariff_for, terms_for
 from src.zones import zone_for_address
 
-PORT_NAMES = {
+PORT_NAMES = port_names() | {
     "GBFXT": "Felixstowe", "GBSOU": "Southampton", "GBLGP": "London Gateway", "NLRTM": "Rotterdam",
     "BEANR": "Antwerp", "DEHAM": "Hamburg", "FRLEH": "Le Havre", "ESVLC": "Valencia", "ITGOA": "Genoa",
     "GRPIR": "Piraeus", "PLGDN": "Gdansk", "SEGOT": "Gothenburg", "SIKOP": "Koper", "FRFOS": "Fos-sur-Mer",
@@ -130,6 +131,9 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict, check: HaulageCheck | Non
 
     port = e.destination_port
     country = e.destination_country
+    if port and port_country(port) != country:
+        internal.append(f"Arrival port {port} is outside {country}: port charges from the {port_country(port)} "
+                        f"tariff ({tariff['name']}); haulage from the {country} Maersk look-up.")
     where = ", ".join(filter(None, [e.delivery_place, e.delivery_postcode]))
     lane = (f"{PORT_NAMES.get(port, port)} ({port})" if port else f"Any port in {country}")
     if scope.delivery and where:
@@ -149,9 +153,11 @@ def price(e: Enquiry, rate_book: RateBook | None = None, cfg: dict | None = None
           haulage_check: HaulageCheck | None = None) -> Quote:
     rb = rate_book or load_rate_book()
     cfg = cfg or load_config()
-    tariff = tariff_for(e.destination_country)
+    tariff = pricing_tariff(e.destination_port, e.destination_country)
     if tariff:
         return _price_tariff(e, tariff, cfg, haulage_check)
+    if tariff_for(e.destination_country):
+        raise PricingError(f"No tariff for the arrival port's country ({port_country(e.destination_port)}).")
     scope = quote_scope(e)
     country = e.destination_country
     port = e.destination_port
