@@ -203,7 +203,7 @@ def test_haulage_is_maersk():
     haul = [l for l in q.lines if l.section == "Delivery"]
     assert [l.code for l in haul] == ["HAUL", "HAUL-FUEL"]
     assert all("Maersk" in l.description for l in haul)
-    assert any("Maersk carrier haulage" in a for a in q.assumptions)
+    assert q.haulage_estimate and any("HAULAGE IS AN ESTIMATE" in a for a in q.assumptions)
 
 
 def test_new_maersk_fuel_rate_changes_price(monkeypatch):

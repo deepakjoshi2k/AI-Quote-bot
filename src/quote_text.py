@@ -35,6 +35,8 @@ def render_quote_text(e: Enquiry, q: Quote, t: Triage | None = None, today: date
         "=" * WIDTH,
         "LINCOLN CARGO – IMPORT QUOTATION" + ("   [MOCK RATES – PROTOTYPE]" if q.is_mock else ""),
         "Draft for staff review – not sent",
+        *(["*** HAULAGE IS AN ESTIMATE – check the Maersk inland price look-up before sending ***"]
+          if q.haulage_estimate else []),
         "=" * WIDTH,
         f"Date:          {today:%d %b %Y}",
         f"Valid until:   {today + timedelta(days=q.validity_days):%d %b %Y} ({q.validity_days} days)",

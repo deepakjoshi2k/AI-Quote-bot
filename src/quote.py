@@ -15,7 +15,7 @@ from __future__ import annotations
 from src.config import load_config
 from src.models import Enquiry, Quote, QuoteLine, Service
 from src.rates import RateBook, delivery_rate, destination_charge, load_rate_book
-from src.haulage import carrier_haulage
+from src.haulage import HaulageCheck, carrier_haulage
 from src.scope import quote_scope
 from src.tariff import tariff_for, terms_for
 from src.zones import zone_for_address
@@ -48,7 +48,7 @@ def _line(section: str, code: str, description: str, basis: str, qty: float, rat
 _BASIS = {"container": "per container", "bl": "per bill of lading", "hbl": "per house bill of lading"}
 
 
-def _price_tariff(e: Enquiry, tariff: dict, cfg: dict) -> Quote:
+def _price_tariff(e: Enquiry, tariff: dict, cfg: dict, check: HaulageCheck | None = None) -> Quote:
     """Price from a country tariff (same charges at every port in the country)."""
     from src.models import Incoterm
     scope = quote_scope(e)
@@ -70,26 +70,35 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict) -> Quote:
         lines.append(_line(section_of[ch["applies"]], ch["code"], ch["description"], _BASIS[ch["basis"]],
                            qty, ch["amount"]))
 
-    # Carrier haulage: always priced as Maersk (data/haulage/maersk.yaml)
+    # Carrier haulage: always Maersk. Checked figures from staff (Maersk inland price look-up) win;
+    # otherwise the flat estimate from data/haulage/maersk.yaml, clearly labelled ESTIMATE.
     heavy = False
     h = None
+    estimate = False
     if scope.delivery:
         h = carrier_haulage(e.destination_country)
         if h is None:
             raise PricingError(f"No Maersk haulage rate for {e.destination_country}.")
-        carrier, fuel = h["carrier"], h["fuel_pct"]
-        lines.append(_line("Delivery", "HAUL", f"Road haulage ({carrier} carrier haulage)", "per container",
-                           n, h["haulage_per_container"]))
+        carrier = h["carrier"]
+        if check:
+            base, fuel = check.haulage_per_container, check.fuel_pct
+            tag = f"{carrier} carrier haulage, checked {check.checked_on:%d %b %Y}"
+        else:
+            base, fuel = h["haulage_per_container"], h["fuel_pct"]
+            tag = f"{carrier} carrier haulage – ESTIMATE"
+            estimate = True
+        lines.append(_line("Delivery", "HAUL", f"Road haulage ({tag})", "per container", n, base))
         lines.append(_line("Delivery", "HAUL-FUEL", f"{carrier} fuel surcharge {fuel:g}% (haulage)",
-                           f"{fuel:g}% of {h['haulage_per_container']:.2f} per container", n,
-                           h["haulage_per_container"] * fuel / 100))
+                           f"{fuel:g}% of {base:.2f} per container", n, base * fuel / 100))
+        for name, amount in (check.extras if check else []):
+            lines.append(_line("Delivery", "INLAND", f"{carrier} inland charge: {name}", "per container", n, amount))
         heavy = per_container_kg is not None and per_container_kg > h["heavy_over_kg"]
-        if heavy:
+        heavy_amount = h["heavy_surcharge"] if (check is None or check.heavy_surcharge is None) else check.heavy_surcharge
+        if heavy and heavy_amount:
             lines.append(_line("Delivery", "HEAVY", f"Heavy container surcharge (over {h['heavy_over_kg'] / 1000:g} t)",
-                               "per container", n, h["heavy_surcharge"]))
+                               "per container", n, heavy_amount))
             lines.append(_line("Delivery", "HEAVY-FUEL", f"{carrier} fuel surcharge {fuel:g}% (heavy surcharge)",
-                               f"{fuel:g}% of {h['heavy_surcharge']:.2f} per container", n,
-                               h["heavy_surcharge"] * fuel / 100))
+                               f"{fuel:g}% of {heavy_amount:.2f} per container", n, heavy_amount * fuel / 100))
 
     if not lines:
         raise PricingError("Nothing to price for this enquiry.")
@@ -102,9 +111,11 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict) -> Quote:
         assumptions.append("Priced for 1 bill of lading.")
     if scope.import_clearance:
         assumptions.append("Priced for 1 house bill of lading (customs).")
-    if h is not None:
-        assumptions.append(f"Haulage priced as {h['carrier']} carrier haulage; {h['carrier']} fuel {h['fuel_pct']:g}% "
-                           f"(updated {h['fuel_updated']}).")
+    if h is not None and check is not None:
+        assumptions.append(f"Haulage and fuel from the {check.source} on {check.checked_on:%d %b %Y}.")
+    elif h is not None:
+        assumptions.append(f"HAULAGE IS AN ESTIMATE (flat {h['carrier']} rate, fuel {h['fuel_pct']:g}% updated "
+                           f"{h['fuel_updated']}): check the {h['carrier']} inland price look-up before sending.")
         if per_container_kg is None:
             assumptions.append(f"Weight not stated: heavy surcharge applies if over {h['heavy_over_kg'] / 1000:g} t per container.")
     exclusions = ["Import duty and import VAT (at cost)", "Ocean freight and origin charges"]
@@ -125,16 +136,17 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict) -> Quote:
         subtotal=round(subtotal, 2), margin=round(margin, 2), total=round(subtotal + margin, 2),
         validity_days=cfg["validity_days"], assumptions=assumptions, exclusions=exclusions,
         terms=terms_for(tariff, country, ddp=e.incoterm is Incoterm.DDP),
-        source=tariff["name"], is_mock=tariff.get("is_mock", False),
+        source=tariff["name"], is_mock=tariff.get("is_mock", False), haulage_estimate=estimate,
     )
 
 
-def price(e: Enquiry, rate_book: RateBook | None = None, cfg: dict | None = None) -> Quote:
+def price(e: Enquiry, rate_book: RateBook | None = None, cfg: dict | None = None,
+          haulage_check: HaulageCheck | None = None) -> Quote:
     rb = rate_book or load_rate_book()
     cfg = cfg or load_config()
     tariff = tariff_for(e.destination_country)
     if tariff:
-        return _price_tariff(e, tariff, cfg)
+        return _price_tariff(e, tariff, cfg, haulage_check)
     scope = quote_scope(e)
     country = e.destination_country
     port = e.destination_port
