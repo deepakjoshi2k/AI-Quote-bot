@@ -19,7 +19,8 @@
     "hazardous": false,
     "ready_date": "2026-11-20",
     "flags": [],
-    "destination_country": "GB"
+    "destination_country": "GB",
+    "total": 1178.75
   },
   "I02": {
     "status": "manual_review",
@@ -59,7 +60,8 @@
     "delivery_postcode": "LE4 9HA",
     "zone": "2",
     "flags": [],
-    "destination_country": "GB"
+    "destination_country": "GB",
+    "total": 1150.0
   },
   "I04": {
     "status": "need_info",
@@ -114,7 +116,8 @@
     "flags": [
       "port_health"
     ],
-    "destination_country": "GB"
+    "destination_country": "GB",
+    "total": 1483.5
   },
   "I07": {
     "status": "quote",
@@ -132,7 +135,8 @@
     "incoterm": "DAP",
     "delivery_postcode": "MK1 1AA",
     "flags": [],
-    "destination_country": "GB"
+    "destination_country": "GB",
+    "total": 74.75
   },
   "I08": {
     "status": "manual_review",

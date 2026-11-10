@@ -17,7 +17,7 @@ pytest
 1. `cp .env.example .env` and fill in one option (Gemini or Groq free tier, or Ollama locally).
 2. `python -m src.llm` should print `LLM connection OK`.
 3. `python -m eval.run_eval` scores extraction + triage on the sample enquiries (`python -m eval.run_eval I12` for one).
-4. `python -m src.try_email data/sample_enquiries/I12.txt` shows one email's details ("Not available" where the email doesn't say) and the questions to ask the sender.
+4. `python -m src.try_email data/sample_enquiries/I12.txt` shows one email's details ("Not available" / "Not relevant"), the decision, the questions for the sender and, when quotable, the priced quote. Each run is logged to `logs/` (git-ignored).
 
 **Import quote scope (agreed with Lincoln Cargo's process):** imports only; the quote goes to, and is charged to, whoever emails, whatever the Incoterm. It covers destination terminal handling + release fee, delivery to the door if asked, and customs clearance only if asked. No ocean freight or origin charges. LCL, DG, special cargo, exports and air/road go to manual review. See `src/scope.py`.
 
@@ -30,4 +30,4 @@ pytest
 - [x] Phase 2 – Incoterm logic (`src/incoterms.py`)
 - [x] Phase 3 – extraction (`llm.py`, `extract.py`, `triage.py`, `zones.py`, lane checks in `rates.py`)
 - [x] Phase 3.1 – direction from countries, customer role, UK **and EU-27** destinations (mock EU sheets via `scripts/make_eu_mock_data.py`)
-- [ ] Phase 4 – pricing (`zones.py`, `rates.py`, `quote.py`)
+- [x] Phase 4 – pricing (`src/quote.py`, `src/pipeline.py`): destination services, UK + EU, FCL (`zones.py`, `rates.py`, `quote.py`)

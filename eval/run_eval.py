@@ -1,4 +1,4 @@
-"""Score the REAL LLM on the 11 sample enquiries (extraction + triage).
+"""Score the REAL LLM on the sample enquiries (extraction + triage + quote totals).
 
     python -m eval.run_eval            # all samples
     python -m eval.run_eval I02 I11    # just some
@@ -6,7 +6,7 @@
 Free tiers limit requests per minute, so the script pauses between emails
 (EVAL_PAUSE_SECONDS in .env, default 12).
 
-Needs a working .env. Mock emails only (rule 3). Phase 7 will add quote totals.
+Needs a working .env. Mock emails only (rule 3).
 Success target (project brief): correct extraction on >= 10 of 11 samples.
 """
 from __future__ import annotations
@@ -19,6 +19,7 @@ from pathlib import Path
 
 from src.extract import extract_enquiry
 from src.llm import get_llm
+from src.quote import price
 from src.triage import triage
 from src.zones import zone_for_address
 
@@ -59,6 +60,10 @@ def check(sid: str, exp: dict, llm) -> tuple[list[str], float]:
         errors.append(f"ready_date: {e.ready_date} != {exp['ready_date']}")
     if "zone" in exp and zone_for_address(e.destination_country, e.delivery_postcode) != exp["zone"]:
         errors.append(f"zone for {e.delivery_postcode} != {exp['zone']}")
+    if "total" in exp:
+        got = price(e).total if t.status == "quote" else None
+        if got is None or abs(got - exp["total"]) > 0.005:
+            errors.append(f"quote total: {got} != {exp['total']}")
     for phrase in exp.get("missing_contains", []):
         if not any(phrase.lower() in m.lower() for m in t.missing_fields):
             errors.append(f"missing_fields lacks '{phrase}'")

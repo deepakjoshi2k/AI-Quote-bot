@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from src.models import Enquiry, Service, Triage
+from src.models import Enquiry, Quote, Service, Triage
 from src.scope import describe_scope, quote_scope
 
 NA = "Not available"
@@ -61,7 +61,30 @@ def enquiry_rows(e: Enquiry) -> list[tuple[str, str]]:
     ]
 
 
-def format_result(e: Enquiry, t: Triage) -> str:
+def format_quote(q: Quote) -> str:
+    cur = q.currency
+    w = max(len(l.description) for l in q.lines)
+    lines = [f"=== QUOTE ({'MOCK RATES – PROTOTYPE' if q.is_mock else 'DRAFT'}) ===",
+             f"  {q.lane}  ·  {q.service.value.upper()}  ·  Incoterm: {_v(q.incoterm)}", ""]
+    section = None
+    for l in q.lines:
+        if l.section != section:
+            section = l.section
+            lines.append(f"  {section}")
+        qty = f"{l.quantity:g} x {l.unit_rate:,.2f}"
+        lines.append(f"    {l.description:<{w}}  {qty:>16}  {cur} {l.amount:>10,.2f}")
+    pad = w + 4 + 2 + 16 + 2
+    lines += ["",
+              f"  {'Subtotal':<{pad}}{cur} {q.subtotal:>10,.2f}",
+              f"  {f'Margin ({q.margin / q.subtotal * 100:g}%)':<{pad}}{cur} {q.margin:>10,.2f}",
+              f"  {'TOTAL':<{pad}}{cur} {q.total:>10,.2f}",
+              "", f"  Valid for {q.validity_days} days.", "  Assumptions:"]
+    lines += [f"    - {a}" for a in q.assumptions]
+    lines += ["  Not included:"] + [f"    - {x}" for x in q.exclusions]
+    return "\n".join(lines)
+
+
+def format_result(e: Enquiry, t: Triage, q: Quote | None = None) -> str:
     rows = enquiry_rows(e)
     width = max(len(k) for k, _ in rows)
     lines = ["=== SHIPMENT DETAILS ==="]
@@ -78,4 +101,6 @@ def format_result(e: Enquiry, t: Triage) -> str:
         lines += [f"  {i}. {m[0].upper() + m[1:]}" for i, m in enumerate(t.missing_fields, 1)]
     if e.extraction_notes:
         lines += ["", "=== NOTES ==="] + [f"  - {n}" for n in e.extraction_notes]
+    if q is not None:
+        lines += ["", format_quote(q)]
     return "\n".join(lines)

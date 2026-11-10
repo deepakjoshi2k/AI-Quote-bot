@@ -1,4 +1,5 @@
-"""Run the agent on one email and print what it found. MOCK / anonymised emails only.
+"""Run the agent on one email: details, decision, questions and (if quotable) the priced quote.
+MOCK / anonymised emails only.
 
     python -m src.try_email data/sample_enquiries/I12.txt     # from a file
     python -m src.try_email                                   # paste, then Enter, Ctrl+Z, Enter (Windows)
@@ -8,9 +9,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from src.extract import extract_enquiry
+from src.pipeline import run_enquiry
 from src.report import format_result
-from src.triage import triage
 
 
 def main(argv: list[str]) -> None:
@@ -19,9 +19,9 @@ def main(argv: list[str]) -> None:
     else:
         print("Paste the email, then press Enter, Ctrl+Z, Enter (Windows) or Ctrl+D (Mac/Linux):\n")
         text = sys.stdin.read()
-    enquiry = extract_enquiry(text)
+    r = run_enquiry(text)
     print()
-    print(format_result(enquiry, triage(enquiry)))
+    print(format_result(r.enquiry, r.triage, r.quote))
 
 
 if __name__ == "__main__":

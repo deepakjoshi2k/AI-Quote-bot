@@ -144,7 +144,7 @@ class ChargeSections(BaseModel):
 
 
 class QuoteLine(BaseModel):
-    section: str        # "Origin" | "Ocean freight" | "UK destination" | "UK customs" | "UK delivery"
+    section: str        # "Destination" | "Customs" | "Delivery"
     code: str
     description: str
     basis: str
@@ -154,7 +154,7 @@ class QuoteLine(BaseModel):
 
 
 class Quote(BaseModel):
-    lane: str                              # "CNSHA → GBFXT"
+    lane: str                              # e.g. "Felixstowe (GBFXT) → SL1 4QP"
     service: Service
     incoterm: Incoterm
     currency: str = "GBP"
