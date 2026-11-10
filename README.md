@@ -19,6 +19,8 @@ pytest
 3. `python -m eval.run_eval` scores extraction + triage on the sample enquiries (`python -m eval.run_eval I12` for one).
 4. `python -m src.try_email data/sample_enquiries/I12.txt` shows one email's details ("Not available" where the email doesn't say) and the questions to ask the sender.
 
+**Import quote scope (agreed with Lincoln Cargo's process):** imports only; the quote goes to, and is charged to, whoever emails, whatever the Incoterm. It covers destination terminal handling + release fee, delivery to the door if asked, and customs clearance only if asked. No ocean freight or origin charges. LCL, DG, special cargo, exports and air/road go to manual review. See `src/scope.py`.
+
 **No-assumption rule:** the agent only uses what the email says. Missing details become "Not available" and a question for the sender; nothing (ports, roles, FCL/LCL) is guessed.
 
 `pytest` never calls a real model: tests use a fake LLM with canned answers (`tests/fixtures/llm_raw.json`).

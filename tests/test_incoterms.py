@@ -19,6 +19,10 @@ EXPECTED_WITH_DELIVERY = {
     "CFR": (F, F, F, F, T, T, T),
     "CIF": (F, F, F, F, T, T, T),
     "DAP": (F, F, F, F, F, T, F),
+    "DPU": (F, F, F, F, F, T, F),
+    "CPT": (F, F, F, F, T, T, T),
+    "CIP": (F, F, F, F, T, T, T),
+    "FAS": (F, F, T, T, T, T, T),
     "DDP": (F, F, F, F, F, F, F),
 }
 
@@ -40,7 +44,7 @@ def test_sections_without_delivery(term, expected, delivery):
     assert _as_tuple(result) == expected[:-1] + (False,)
 
 
-def test_all_seven_incoterms_covered():
+def test_all_incoterms_covered():
     assert set(EXPECTED_WITH_DELIVERY) == {t.value for t in Incoterm if t is not Incoterm.UNKNOWN}
 
 
@@ -84,7 +88,7 @@ def test_sample_I07_dap_clearance_only():
 
 # ---------- assumptions ----------
 
-@pytest.mark.parametrize("term", ["FCA", "CFR", "CIF", "DAP"])
+@pytest.mark.parametrize("term", ["FCA", "CFR", "CIF", "DAP", "DPU"])
 def test_assumptions_present(term):
     assert incoterm_assumptions(term)
 
@@ -110,8 +114,8 @@ def test_origin_charges_csv_matches_incoterm_rules():
     for _, row in df.iterrows():
         section = ORIGIN_CODE_TO_SECTION[row["code"]]
         csv_terms = set(row["buyer_pays_when_incoterm"].split(";"))
+        csv_scope = {"EXW", "FCA", "FOB", "CFR", "CIF", "DAP", "DDP"}   # terms the mock CSV was written for
         rule_terms = {
-            t.value for t in Incoterm
-            if t is not Incoterm.UNKNOWN and getattr(charge_sections(t, False), section)
+            t for t in csv_scope if getattr(charge_sections(t, False), section)
         }
         assert csv_terms == rule_terms, f"{row['origin_port']} {row['code']}"

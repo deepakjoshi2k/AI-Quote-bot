@@ -23,8 +23,8 @@ from src.rates import RateBook, load_rate_book
 from src.zones import normalise_postcode
 
 PROMPT_PATH = Path(__file__).parent / "prompts" / "extract.md"
-SUPPORTED_INCOTERMS = {"EXW", "FCA", "FOB", "CFR", "CIF", "DAP", "DDP"}
-KNOWN_INCOTERMS = SUPPORTED_INCOTERMS | {"CPT", "CIP", "DPU", "FAS"}
+SUPPORTED_INCOTERMS = {"EXW", "FCA", "FOB", "CFR", "CIF", "DAP", "DDP", "CPT", "CIP", "DPU", "FAS"}
+KNOWN_INCOTERMS = SUPPORTED_INCOTERMS
 
 
 # ---------- 1. LLM ----------
@@ -264,7 +264,9 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
         special_requirements=special,
         incoterm=incoterm,
         incoterm_place=raw.incoterm_place,
-        delivery_required=raw.delivery_required,
+        delivery_required=False if raw.clearance_only else raw.delivery_required,
+        customs_clearance_requested=True if raw.clearance_only else raw.customs_clearance_requested,
+        clearance_only=raw.clearance_only,
         delivery_postcode=postcode,
         delivery_place=raw.delivery_place,
         ready_date=raw.ready_date,
