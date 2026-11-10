@@ -187,3 +187,44 @@ def test_mock_quote_text_is_labelled(fake_llm):
     from src.quote_text import render_quote_text
     r = run_enquiry(sample_text("I01"), llm=fake_llm, log=False)
     assert "MOCK RATES" in render_quote_text(r.enquiry, r.quote)
+
+
+# ---------- Maersk carrier haulage (data/haulage/maersk.yaml) ----------
+
+def _fr(**kw):
+    base = dict(destination_country="FR", destination_port=None, delivery_postcode="51300",
+                containers=[ContainerLine(container_type="20GP", quantity=1)], total_gross_weight_kg=21000)
+    base.update(kw)
+    return _fcl(**base)
+
+
+def test_haulage_is_maersk():
+    q = price(_fr())
+    haul = [l for l in q.lines if l.section == "Delivery"]
+    assert [l.code for l in haul] == ["HAUL", "HAUL-FUEL"]
+    assert all("Maersk" in l.description for l in haul)
+    assert any("Maersk carrier haulage" in a for a in q.assumptions)
+
+
+def test_new_maersk_fuel_rate_changes_price(monkeypatch):
+    from src.haulage import carrier_haulage as real
+    monkeypatch.setattr("src.quote.carrier_haulage", lambda c: {**real(c), "fuel_pct": 10.0})
+    q = price(_fr())
+    # 455 tariff + 720 haulage + 10% fuel (72) = 1247
+    assert q.total == pytest.approx(1247.0)
+
+
+def test_stale_maersk_fuel_warns_staff(monkeypatch):
+    from datetime import date
+    from src.haulage import carrier_haulage as real
+    from src.triage import triage
+    monkeypatch.setattr("src.triage.carrier_haulage", lambda c: {**real(c), "fuel_updated": date(2026, 1, 1)})
+    t = triage(_fr())
+    assert t.status == "quote" and any("last updated" in n for n in t.notes)
+
+
+def test_fresh_fuel_no_warning():
+    from datetime import date
+    from src.haulage import carrier_haulage, fuel_is_stale
+    assert not fuel_is_stale(carrier_haulage("FR"), today=date(2026, 11, 20))
+    assert fuel_is_stale(carrier_haulage("FR"), today=date(2026, 12, 1))

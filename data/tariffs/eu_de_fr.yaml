@@ -10,7 +10,6 @@ is_mock: false
 # applies:  always     -> every FCL quote
 #           delivery   -> when we deliver (we always deliver unless the sender says not to)
 #           clearance  -> only if the sender asks for customs clearance
-#           heavy      -> per container heavier than heavy_over_kg
 # basis:    container | bl (bill of lading) | hbl (house bill of lading)
 # fuel_pct: fuel surcharge % added on top of that charge
 charges:
@@ -19,14 +18,12 @@ charges:
   - {code: SEC,     description: "Security (Sec)",                   basis: container, amount: 25.00,  applies: always}
   - {code: LOLO,    description: "Lo/Lo (lift on / lift off)",       basis: container, amount: 90.00,  applies: always}
   - {code: CUSTOMS, description: "Customs clearance",                basis: hbl,       amount: 150.00, applies: clearance}
-  - {code: HAUL,    description: "Road haulage to consignee",        basis: container, amount: 720.00, applies: delivery, fuel_pct: 18.5}
-  - {code: HEAVY,   description: "Heavy container surcharge (over 23 t)", basis: container, amount: 200.00, applies: heavy, fuel_pct: 18.5}
 
-heavy_over_kg: 23000
+# Road haulage + fuel + heavy surcharge are carrier haulage, priced from data/haulage/maersk.yaml.
 
 # Printed on every quote for these countries.
 terms:
-  - "Road haulage is a fixed rate for now; it varies with distance and will be confirmed for the delivery address."
+  - "Road haulage and fuel surcharge are Maersk carrier haulage rates; they vary with distance and Maersk's fuel % (reviewed every two weeks) and will be confirmed for the delivery address."
   - "14 days minimum demurrage and detention free time is required from the shipping line. With anything less, demurrage and detention may apply."
   - "If there is a delay due to customs inspection, X-ray, or non-availability of haulage during the free time, additional charges apply."
   - "Free time for unloading is 2 hours; after that EUR 75 per hour applies."

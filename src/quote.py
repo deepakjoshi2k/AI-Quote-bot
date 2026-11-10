@@ -15,6 +15,7 @@ from __future__ import annotations
 from src.config import load_config
 from src.models import Enquiry, Quote, QuoteLine, Service
 from src.rates import RateBook, delivery_rate, destination_charge, load_rate_book
+from src.haulage import carrier_haulage
 from src.scope import quote_scope
 from src.tariff import tariff_for, terms_for
 from src.zones import zone_for_address
@@ -57,23 +58,39 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict) -> Quote:
     if not e.clearance_only and n == 0:
         raise PricingError("Container size and number are needed.")
     per_container_kg = (e.total_gross_weight_kg / n) if (e.total_gross_weight_kg and n) else None
-    heavy = per_container_kg is not None and per_container_kg > tariff["heavy_over_kg"]
 
-    wanted = {"always": not e.clearance_only, "delivery": scope.delivery,
-              "clearance": scope.import_clearance, "heavy": heavy and scope.delivery}
-    section_of = {"always": "Destination", "clearance": "Customs", "delivery": "Delivery", "heavy": "Delivery"}
+    # Lincoln Cargo's own destination charges (tariff)
+    wanted = {"always": not e.clearance_only, "clearance": scope.import_clearance}
+    section_of = {"always": "Destination", "clearance": "Customs"}
     lines: list[QuoteLine] = []
     for ch in tariff["charges"]:
-        if not wanted[ch["applies"]]:
+        if not wanted.get(ch["applies"], False):
             continue
         qty = n if ch["basis"] == "container" else 1
-        basis = _BASIS[ch["basis"]]
-        section = section_of[ch["applies"]]
-        lines.append(_line(section, ch["code"], ch["description"], basis, qty, ch["amount"]))
-        if ch.get("fuel_pct"):
-            lines.append(_line(section, f"{ch['code']}-FUEL", f"Fuel surcharge {ch['fuel_pct']:g}% ({ch['code'].lower()})".replace("(haul)", "(haulage)").replace("(heavy)", "(heavy surcharge)"),
-                               f"{ch['fuel_pct']:g}% of {ch['amount']:.2f} per container", qty,
-                               ch["amount"] * ch["fuel_pct"] / 100))
+        lines.append(_line(section_of[ch["applies"]], ch["code"], ch["description"], _BASIS[ch["basis"]],
+                           qty, ch["amount"]))
+
+    # Carrier haulage: always priced as Maersk (data/haulage/maersk.yaml)
+    heavy = False
+    h = None
+    if scope.delivery:
+        h = carrier_haulage(e.destination_country)
+        if h is None:
+            raise PricingError(f"No Maersk haulage rate for {e.destination_country}.")
+        carrier, fuel = h["carrier"], h["fuel_pct"]
+        lines.append(_line("Delivery", "HAUL", f"Road haulage ({carrier} carrier haulage)", "per container",
+                           n, h["haulage_per_container"]))
+        lines.append(_line("Delivery", "HAUL-FUEL", f"{carrier} fuel surcharge {fuel:g}% (haulage)",
+                           f"{fuel:g}% of {h['haulage_per_container']:.2f} per container", n,
+                           h["haulage_per_container"] * fuel / 100))
+        heavy = per_container_kg is not None and per_container_kg > h["heavy_over_kg"]
+        if heavy:
+            lines.append(_line("Delivery", "HEAVY", f"Heavy container surcharge (over {h['heavy_over_kg'] / 1000:g} t)",
+                               "per container", n, h["heavy_surcharge"]))
+            lines.append(_line("Delivery", "HEAVY-FUEL", f"{carrier} fuel surcharge {fuel:g}% (heavy surcharge)",
+                               f"{fuel:g}% of {h['heavy_surcharge']:.2f} per container", n,
+                               h["heavy_surcharge"] * fuel / 100))
+
     if not lines:
         raise PricingError("Nothing to price for this enquiry.")
 
@@ -85,8 +102,11 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict) -> Quote:
         assumptions.append("Priced for 1 bill of lading.")
     if scope.import_clearance:
         assumptions.append("Priced for 1 house bill of lading (customs).")
-    if per_container_kg is None and scope.delivery:
-        assumptions.append(f"Weight not stated: heavy surcharge applies if over {tariff['heavy_over_kg'] / 1000:g} t per container.")
+    if h is not None:
+        assumptions.append(f"Haulage priced as {h['carrier']} carrier haulage; {h['carrier']} fuel {h['fuel_pct']:g}% "
+                           f"(updated {h['fuel_updated']}).")
+        if per_container_kg is None:
+            assumptions.append(f"Weight not stated: heavy surcharge applies if over {h['heavy_over_kg'] / 1000:g} t per container.")
     exclusions = ["Import duty and import VAT (at cost)", "Ocean freight and origin charges"]
     if not scope.import_clearance:
         exclusions.insert(0, "Customs clearance (available on request)")

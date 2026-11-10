@@ -15,6 +15,7 @@ from src.config import load_config
 from src.models import ChargeSections, Direction, Enquiry, Incoterm, Mode, Service, Triage, TriageFlag
 from src.rates import RateBook, load_rate_book
 from src.scope import clearance_note, quote_scope
+from src.haulage import carrier_haulage, fuel_age_days, fuel_is_stale
 from src.tariff import tariff_for
 from src.zones import MANUAL, zone_for_address
 
@@ -113,8 +114,13 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
                        if tariff else ""))
     if tariff:
         info.append(f"Priced from: {tariff['name']} ({tariff['currency']}, same charges at every port).")
-        if "Road haulage" in " ".join(tariff.get("terms", [])):
-            info.append("Road haulage is a fixed rate for now: check it for this delivery distance.")
+        h = carrier_haulage(e.destination_country) if scope.delivery else None
+        if h:
+            info.append(f"Haulage priced as {h['carrier']} carrier haulage (flat rate for now): check {h['carrier']}'s "
+                        "inland rate for this delivery address.")
+            if fuel_is_stale(h):
+                info.append(f"{h['carrier']} fuel % ({h['fuel_pct']:g}%) was last updated {fuel_age_days(h)} days ago: "
+                            "check the current rate and update data/haulage/maersk.yaml.")
     elif e.destination_country not in (None, "GB"):
         info.append(f"EU import ({e.destination_country}): customs via an EU customs partner; "
                     "duties and import VAT at cost. Confirm process with Lincoln Cargo.")
@@ -142,8 +148,9 @@ def _missing_fields(e: Enquiry, scope: ChargeSections) -> tuple[list[str], list[
             (opt if tariff else req).append("port of arrival (discharge port)")
         if scope.delivery and not e.delivery_postcode:
             req.append("delivery address and postcode")
-        if tariff and scope.delivery and e.total_gross_weight_kg is None:
-            opt.append(f"gross weight per container (surcharge over {tariff['heavy_over_kg'] / 1000:g} t)")
+        h = carrier_haulage(e.destination_country) if (tariff and scope.delivery) else None
+        if h and e.total_gross_weight_kg is None:
+            opt.append(f"gross weight per container (surcharge over {h['heavy_over_kg'] / 1000:g} t)")
 
     if e.incoterm is Incoterm.UNKNOWN:
         opt.append("Incoterm (e.g. FOB, CIF, DAP)")

@@ -1,0 +1,26 @@
+# Carrier haulage: the shipping line trucks the container from the port to the consignee and sets
+# the haulage price and its fuel surcharge. We always price haulage as MAERSK carrier haulage.
+#
+# Maersk reviews its inland fuel % every two weeks: update `fuel_pct` and `fuel_updated` when it changes.
+# Real haulage varies with distance from the port; until we have Maersk's rates by distance/region,
+# `haulage_per_container` is a flat rate per country (from Lincoln Cargo's Nov 2026 example).
+carrier: Maersk
+fuel_review_days: 14          # warn staff if fuel_updated is older than this
+
+countries:
+  DE:
+    haulage_per_container: 720.00
+    fuel_pct: 18.5
+    fuel_updated: 2026-11-10
+    heavy_over_kg: 23000      # per container
+    heavy_surcharge: 200.00   # per container, fuel also applies
+    currency: EUR
+    source: "Lincoln Cargo example quote, Hamburg, 10 Nov 2026"
+  FR:
+    haulage_per_container: 720.00
+    fuel_pct: 18.5
+    fuel_updated: 2026-11-10
+    heavy_over_kg: 23000
+    heavy_surcharge: 200.00
+    currency: EUR
+    source: "Lincoln Cargo example quote ('same for France'), 10 Nov 2026"
