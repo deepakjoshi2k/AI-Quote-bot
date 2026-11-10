@@ -24,7 +24,8 @@ def _matches(patterns: list[str], text: str) -> list[str]:
 
 def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
                    ) -> tuple[list[str], list[TriageFlag], list[str]]:
-    """Returns (blocking reasons, flags, info notes for staff)."""
+    """Returns (blocking reasons, flags, notes for staff). Notes never block: DAP clearance, EU import,
+    DDP, port health, overweight container."""
     reasons: list[str] = []
     flags: list[TriageFlag] = []
     info: list[str] = []
@@ -92,8 +93,8 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
     n_all = sum(c.quantity for c in e.containers)
     if n20 and e.total_gross_weight_kg and e.total_gross_weight_kg / n_all > heavy:
         flags.append(TriageFlag.HEAVY_CONTAINER)
-        info.append(f"Heavy 20GP (~{e.total_gross_weight_kg / n_all:,.0f} kg per container): "
-                    "check road weight limits / special chassis for delivery.")
+        info.append(f"20GP over {heavy:,} kg (~{e.total_gross_weight_kg / n_all:,.0f} kg per container): "
+                    "above typical max payload, check with the carrier and haulier.")
     if e.commodity and _matches(tcfg["port_health_patterns"], e.commodity):
         flags.append(TriageFlag.PORT_HEALTH)
         info.append(f"Food/plant product ({e.commodity}): port health checks possible, at cost.")
@@ -141,12 +142,12 @@ def triage(enquiry: Enquiry, rate_book: RateBook | None = None) -> Triage:
     e = enquiry
     scope = quote_scope(e)
 
-    blocking, flags, info = _manual_checks(e, scope, rb, cfg)
+    blocking, flags, notes = _manual_checks(e, scope, rb, cfg)
     if blocking:
-        return Triage(status="manual_review", reasons=blocking + info, flags=flags)
+        return Triage(status="manual_review", reasons=blocking, notes=notes, flags=flags)
 
     required, optional = _missing_fields(e, scope)
     if required:
-        return Triage(status="need_info", reasons=info, missing_fields=required + optional, flags=flags)
+        return Triage(status="need_info", notes=notes, missing_fields=required + optional, flags=flags)
     # Optional questions ride along with the quote (e.g. "which Incoterm?"); they never block it.
-    return Triage(status="quote", reasons=info, missing_fields=optional, flags=flags)
+    return Triage(status="quote", notes=notes, missing_fields=optional, flags=flags)

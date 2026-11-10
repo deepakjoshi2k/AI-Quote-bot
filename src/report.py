@@ -90,7 +90,12 @@ def format_result(e: Enquiry, t: Triage, q: Quote | None = None) -> str:
     lines = ["=== SHIPMENT DETAILS ==="]
     lines += [f"  {k:<{width}}  {v}" for k, v in rows]
     lines += ["", f"=== DECISION: {t.status.upper()} ==="]
-    lines += [f"  - {r}" for r in t.reasons] or ["  (no warnings)"]
+    if t.status == "manual_review":
+        lines += [f"  Why: {r}" for r in t.reasons]
+    elif t.status == "need_info":
+        lines += ["  Waiting for the sender's answers below."]
+    else:
+        lines += ["  Ready to quote."]
     if t.status != "manual_review":
         lines += ["", "=== QUOTE WILL INCLUDE ==="]
         lines += [f"  - {item}" for item in describe_scope(quote_scope(e))]
@@ -99,8 +104,9 @@ def format_result(e: Enquiry, t: Triage, q: Quote | None = None) -> str:
         title = "ASK THE SENDER" if t.status == "need_info" else "ALSO ASK (does not block the quote)"
         lines += ["", f"=== {title} ==="]
         lines += [f"  {i}. {m[0].upper() + m[1:]}" for i, m in enumerate(t.missing_fields, 1)]
-    if e.extraction_notes:
-        lines += ["", "=== NOTES ==="] + [f"  - {n}" for n in e.extraction_notes]
+    staff_notes = t.notes + e.extraction_notes
+    if staff_notes:
+        lines += ["", "=== NOTES FOR STAFF ==="] + [f"  - {n}" for n in staff_notes]
     if q is not None:
         lines += ["", format_quote(q)]
     return "\n".join(lines)

@@ -123,7 +123,8 @@ class TriageFlag(str, Enum):
 
 class Triage(BaseModel):
     status: TriageStatus
-    reasons: list[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)        # why it's manual_review (blocking only)
+    notes: list[str] = Field(default_factory=list)          # notes for staff: never block
     missing_fields: list[str] = Field(default_factory=list)
     flags: list[TriageFlag] = Field(default_factory=list)
 
