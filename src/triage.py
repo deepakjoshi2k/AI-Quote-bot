@@ -116,8 +116,8 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
         info.append(f"Priced from: {tariff['name']} ({tariff['currency']}, same charges at every port).")
         h = carrier_haulage(e.destination_country) if scope.delivery else None
         if h:
-            info.append(f"Haulage priced as {h['carrier']} carrier haulage (flat rate for now): check {h['carrier']}'s "
-                        "inland rate for this delivery address.")
+            info.append(f"Road haulage = {h['carrier']} haulage + {h['carrier']} fuel from the {h['carrier']} inland "
+                        "price look-up (box below), then our fuel surcharge on top.")
             if fuel_is_stale(h):
                 info.append(f"{h['carrier']} fuel % ({h['fuel_pct']:g}%) was last updated {fuel_age_days(h)} days ago: "
                             "check the current rate and update data/haulage/maersk.yaml.")

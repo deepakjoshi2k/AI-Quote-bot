@@ -74,10 +74,11 @@ def format_quote(q: Quote) -> str:
         qty = f"{l.quantity:g} x {l.unit_rate:,.2f}"
         lines.append(f"    {l.description:<{w}}  {qty:>16}  {cur} {l.amount:>10,.2f}")
     pad = w + 4 + 2 + 16 + 2
-    lines += ["",
-              f"  {'Subtotal':<{pad}}{cur} {q.subtotal:>10,.2f}",
-              f"  {f'Margin ({q.margin / q.subtotal * 100:g}%)':<{pad}}{cur} {q.margin:>10,.2f}",
-              f"  {'TOTAL':<{pad}}{cur} {q.total:>10,.2f}",
+    lines += [""]
+    if q.margin:
+        lines += [f"  {'Subtotal':<{pad}}{cur} {q.subtotal:>10,.2f}",
+                  f"  {f'Margin ({q.margin / q.subtotal * 100:g}%)':<{pad}}{cur} {q.margin:>10,.2f}"]
+    lines += [f"  {'TOTAL':<{pad}}{cur} {q.total:>10,.2f}",
               "", f"  Valid for {q.validity_days} days.", "  Assumptions:"]
     lines += [f"    - {a}" for a in q.assumptions]
     lines += ["  Not included:"] + [f"    - {x}" for x in q.exclusions]
@@ -97,7 +98,9 @@ def format_result(e: Enquiry, t: Triage, q: Quote | None = None) -> str:
     elif t.status == "need_info":
         lines += ["  Waiting for the sender's answers below."]
     else:
-        lines += ["  Ready to quote."]
+        from src.haulage import needs_lookup
+        lines += ["  Ready to quote once the Maersk haulage and fuel are entered (see below)."
+                  if needs_lookup(e) else "  Ready to quote."]
     if t.status != "manual_review":
         lines += ["", "=== QUOTE WILL INCLUDE ==="]
         lines += [f"  - {item}" for item in describe_scope(quote_scope(e))]
