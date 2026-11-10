@@ -54,28 +54,30 @@ def test_needs_lookup_only_with_delivery_in_maersk_country():
 
 def test_checked_figures_replace_estimate():
     q = price(_fr(), haulage_check=HaulageCheck(650.0, 46.80, checked_on=date(2026, 11, 10)))
-    # tariff 455 + haulage 650 + fuel 46.80 = 1151.80
-    assert q.total == pytest.approx(1151.80)
+    # tariff 455 + road haulage (650 + 46.80 = 696.80) + fuel 22% (153.30) = 1305.10
+    assert q.total == pytest.approx(1305.10)
     assert not q.haulage_estimate
     assert any("10 Nov 2026" in n for n in q.internal_notes)
 
 
 def test_estimate_without_check():
     q = price(_fr())
-    assert q.haulage_estimate and q.total == pytest.approx(1308.20)
+    assert q.haulage_estimate and q.total == pytest.approx(1495.90)
 
 
 def test_extras_per_container():
     e = _fr(containers=[ContainerLine(container_type="40HC", quantity=2)], total_gross_weight_kg=40000)
     q = price(e, haulage_check=HaulageCheck(700.0, 35.0, extras=[("Toll", 35.0)]))
-    # tariff: THC 580 + Doc 50 + Sec 50 + Lo/Lo 180 = 860; haulage 1400 + fuel 70 + toll 70 = 1540
-    assert q.total == pytest.approx(860 + 1540)
+    # tariff: THC 580 + Doc 50 + Sec 50 + Lo/Lo 180 = 860
+    # road haulage 2 x (700 + 35) = 1470 + fuel 22% (323.40) + toll 2 x 35 (no fuel on it) = 1863.40
+    assert q.total == pytest.approx(860 + 1470 + 323.40 + 70)
 
 
 def test_heavy_from_check_or_file():
     heavy = _fr(total_gross_weight_kg=25000)
     default = price(heavy, haulage_check=HaulageCheck(650, 46.8))
-    assert [l.amount for l in default.lines if l.code == "HEAVY"] == [237.0]          # our 200 + 18.5% fuel
+    assert [(l.code, l.amount) for l in default.lines if l.code.startswith("HEAVY")] == [("HEAVY", 200.0),
+                                                                                        ("HEAVY-FUEL", 44.0)]
     assert "HEAVY" not in {l.code for l in price(heavy, haulage_check=HaulageCheck(650, 46.8, heavy_surcharge=0)).lines}
     q = price(heavy, haulage_check=HaulageCheck(650, 46.8, heavy_surcharge=150))
     assert [l.amount for l in q.lines if l.code == "HEAVY"] == [150.0]
@@ -105,8 +107,8 @@ def test_cli_flags(monkeypatch, fake_llm, tmp_path, capsys):
     te = _patch_run(monkeypatch, fake_llm, tmp_path)
     te.main(["data/sample_enquiries/I12.txt", "--haulage", "650", "--fuel", "46.80"])
     out = capsys.readouterr().out
-    assert "MAERSK INLAND PRICE LOOK-UP" in out and "TOTAL EUR 1,151.80" in out
-    assert "1,151.80" in (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
+    assert "MAERSK INLAND PRICE LOOK-UP" in out and "TOTAL EUR 1,305.10" in out
+    assert "1,305.10" in (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
 
 
 def test_cli_interactive(monkeypatch, fake_llm, tmp_path, capsys):
@@ -115,7 +117,7 @@ def test_cli_interactive(monkeypatch, fake_llm, tmp_path, capsys):
     answers = iter(["650", "46.80", "Toll=35", ""])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
     te.main(["data/sample_enquiries/I12.txt"])
-    assert "TOTAL EUR 1,186.80" in capsys.readouterr().out      # 1151.80 + toll 35
+    assert "TOTAL EUR 1,340.10" in capsys.readouterr().out      # 1305.10 + toll 35
 
 
 def test_cli_skip_keeps_estimate(monkeypatch, fake_llm, tmp_path, capsys):
@@ -127,43 +129,34 @@ def test_cli_skip_keeps_estimate(monkeypatch, fake_llm, tmp_path, capsys):
 
 
 
-# ---------- hidden markup on haulage + fuel ----------
+# ---------- one road-haulage line (Maersk haulage + Maersk fuel) + our 22% fuel surcharge ----------
 
-def test_markup_on_haulage_and_fuel_only(monkeypatch):
-    monkeypatch.setenv("HAULAGE_MARKUP_PCT", "10")
-    q = price(_fr(), haulage_check=HaulageCheck(650.0, 46.80, extras=[("Toll", 35.0)]))
+def test_example_100_plus_20():
+    q = price(_fr(), haulage_check=HaulageCheck(100.0, 20.0))
     by = {l.code: l.amount for l in q.lines}
-    assert by["HAUL"] == pytest.approx(715.0) and by["HAUL-FUEL"] == pytest.approx(51.48)   # +10%
-    assert by["INLAND"] == 35.0 and by["THC"] == 290.0                                     # no markup
-    assert q.total == pytest.approx(455 + 715 + 51.48 + 35)
-    assert q.margin == 0                                                                    # nothing shown as margin
+    assert by["HAUL"] == 120.0 and by["HAUL-FUEL"] == pytest.approx(26.40)
+    assert q.total == pytest.approx(455 + 120 + 26.40)
 
 
-def test_markup_never_reaches_the_customer(monkeypatch, fake_llm):
+def test_customer_text_shows_no_maersk_breakdown(fake_llm):
     from src.quote_text import render_quote_text
-    monkeypatch.setenv("HAULAGE_MARKUP_PCT", "12.5")
     r = run_enquiry(sample_text("I12"), llm=fake_llm, log=False)
     q = price(r.enquiry, haulage_check=HaulageCheck(650.0, 46.80))
     text = render_quote_text(r.enquiry, q, r.triage)
-    for secret in ["12.5", "markup", "Markup", "Maersk", "650.00", "46.80", "INTERNAL", "Hidden", "cost per container"]:
+    for secret in ["Maersk", "650.00", "46.80", "INTERNAL"]:
         assert secret not in text, secret
-    assert "Road haulage" in text and "Fuel surcharge" in text
-    assert any("Hidden markup 12.5%" in n for n in q.internal_notes)                    # staff can see it
+    assert "Road haulage" in text and "696.80" in text and "Fuel surcharge 22%" in text and "153.30" in text
 
 
-def test_staff_report_shows_internal(monkeypatch):
+def test_staff_report_shows_breakdown():
     from src.report import format_quote
-    monkeypatch.setenv("HAULAGE_MARKUP_PCT", "10")
     out = format_quote(price(_fr(), haulage_check=HaulageCheck(650.0, 46.80)))
-    assert "INTERNAL – staff only" in out and "Hidden markup 10%" in out
+    assert "INTERNAL – staff only" in out and "Maersk haulage 650.00 + Maersk fuel 46.80 = 696.80" in out
 
 
-def test_bad_markup_value(monkeypatch):
-    monkeypatch.setenv("HAULAGE_MARKUP_PCT", "ten")
-    with pytest.raises(ValueError):
-        price(_fr())
-
-
-def test_markup_percent_sign_allowed(monkeypatch):
-    monkeypatch.setenv("HAULAGE_MARKUP_PCT", "10%")
-    assert price(_fr(), haulage_check=HaulageCheck(100.0, 10.0)).total == pytest.approx(455 + 121)
+def test_fuel_pct_comes_from_tariff(monkeypatch):
+    from src.tariff import tariff_for
+    t = dict(tariff_for("FR")); t["haulage_fuel_surcharge_pct"] = 10
+    monkeypatch.setattr("src.quote.tariff_for", lambda c: t)
+    q = price(_fr(), haulage_check=HaulageCheck(100.0, 20.0))
+    assert {l.code: l.amount for l in q.lines}["HAUL-FUEL"] == 12.0

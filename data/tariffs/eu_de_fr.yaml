@@ -19,7 +19,9 @@ charges:
   - {code: LOLO,    description: "Lo/Lo (lift on / lift off)",       basis: container, amount: 90.00,  applies: always}
   - {code: CUSTOMS, description: "Customs clearance",                basis: hbl,       amount: 150.00, applies: clearance}
 
-# Road haulage + fuel + heavy surcharge are carrier haulage, priced from data/haulage/maersk.yaml.
+# Road haulage = Maersk haulage + Maersk fuel (cost from the staff look-up, or the estimate in
+# data/haulage/maersk.yaml), shown to the customer as ONE line. Then our fuel surcharge below is added.
+haulage_fuel_surcharge_pct: 22        # % of the road haulage line, shown as "Fuel surcharge"
 
 # Printed on every quote for these countries.
 terms:

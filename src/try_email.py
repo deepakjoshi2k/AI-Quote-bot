@@ -10,7 +10,8 @@ quotes/quote-<date-time>.txt. Skip (press Enter) and the quote is saved marked a
 
 You can also pass the figures directly:
     python -m src.try_email email.txt --haulage 650 --fuel 46.80 --extra "Toll=35" --heavy 0
-    (--fuel is the fuel surcharge AMOUNT per container. The hidden markup comes from HAULAGE_MARKUP_PCT in .env.)
+    (--fuel is Maersk's fuel AMOUNT per container. The customer sees one "Road haulage" line = haulage + Maersk fuel,
+     then "Fuel surcharge 22%" on top of it.)
 """
 from __future__ import annotations
 
@@ -62,8 +63,7 @@ def ask_for_check(heavy_possible: bool) -> HaulageCheck | None:
             print(f"  {err}")
     heavy = None
     if heavy_possible:
-        heavy = _ask_number("Heavy/weight surcharge per container incl. its fuel (EUR, 0 if included) "
-                            "[Enter = use our 200 + fuel]: ")
+        heavy = _ask_number("Heavy/weight surcharge per container (EUR, 0 if included) [Enter = use our 200]: ")
     return HaulageCheck(haulage_per_container=haulage, fuel_per_container=fuel, extras=extras, heavy_surcharge=heavy)
 
 
@@ -73,7 +73,7 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--haulage", type=float, help="Maersk haulage per container (EUR)")
     ap.add_argument("--fuel", type=float, help="Maersk import fuel surcharge per container (EUR amount, not %%)")
     ap.add_argument("--extra", type=_parse_extra, action="append", default=[], help="other inland charge, Name=amount")
-    ap.add_argument("--heavy", type=float, help="heavy surcharge per container incl. fuel (0 if included)")
+    ap.add_argument("--heavy", type=float, help="heavy surcharge per container (0 if included); 22%% fuel is added")
     ap.add_argument("--no-prompt", action="store_true", help="don't ask for Maersk figures")
     args = ap.parse_args(argv)
 
