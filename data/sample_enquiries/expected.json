@@ -214,9 +214,7 @@
     "incoterm": "DAP",
     "total_gross_weight_kg": 21000,
     "delivery_postcode": "51300",
-    "flags": [
-      "heavy_container"
-    ],
+    "flags": [],
     "destination_port": null,
     "zone": "2",
     "missing_contains": [

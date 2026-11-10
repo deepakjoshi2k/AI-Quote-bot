@@ -9,7 +9,7 @@ service_thresholds:
   lcl_max_cbm: 13.0       # below this, suggest LCL
   fcl_min_cbm: 15.0       # above this, suggest FCL; in between, either
 fcl:
-  heavy_20gp_kg: 20000    # flag a 20GP heavier than this
+  heavy_20gp_kg: 28000    # note (never blocks) only above a 20GP's typical max payload (~28 t); confirm with Lincoln Cargo
 # Where Lincoln Cargo operates. A shipment whose DESTINATION is in this list is an "import".
 # EU-27 + UK. Add NO / CH / IS etc. if they also count.
 home_countries: [GB, AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT, LV, LT, LU, MT, NL, PL, PT, RO, SK, SI, ES, SE]

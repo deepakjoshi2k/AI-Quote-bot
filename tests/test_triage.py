@@ -87,17 +87,17 @@ def test_every_incoterm_is_quotable(term):
 @pytest.mark.parametrize("term", ["DAP", "DPU"])
 def test_dap_dpu_clearance_note(term):
     t = triage(_fcl(incoterm=Incoterm(term)))
-    assert any("Email the importer" in r for r in t.reasons)
+    assert any("Email the importer" in r for r in t.notes)
 
 
 def test_dap_note_not_added_when_clearance_requested():
     t = triage(_fcl(incoterm=Incoterm.DAP, customs_clearance_requested=True))
-    assert not any("Email the importer" in r for r in t.reasons)
+    assert not any("Email the importer" in r for r in t.notes)
 
 
 def test_ddp_quoted_with_duty_note():
     t = triage(_fcl(incoterm=Incoterm.DDP))
-    assert t.status == "quote" and any("DDP" in r for r in t.reasons)
+    assert t.status == "quote" and any("DDP" in r for r in t.notes)
 
 
 def test_missing_incoterm_does_not_block():
@@ -179,15 +179,30 @@ def test_home_country_without_rates_routed(monkeypatch):
 
 # ---------- warnings never block ----------
 
-def test_heavy_container_does_not_block_quote():
-    e = _fcl(total_gross_weight_kg=24000, containers=[ContainerLine(container_type="20GP", quantity=1)])
+def test_21_tonne_20gp_is_not_heavy():
+    e = _fcl(total_gross_weight_kg=21000, containers=[ContainerLine(container_type="20GP", quantity=1)])
     t = triage(e)
-    assert t.status == "quote" and TriageFlag.HEAVY_CONTAINER in t.flags
+    assert t.status == "quote" and TriageFlag.HEAVY_CONTAINER not in t.flags and not t.notes
+
+
+def test_overweight_20gp_is_a_note_not_a_blocker():
+    e = _fcl(total_gross_weight_kg=30000, containers=[ContainerLine(container_type="20GP", quantity=1)])
+    t = triage(e)
+    assert t.status == "quote" and TriageFlag.HEAVY_CONTAINER in t.flags and t.reasons == []
+
+
+@pytest.mark.parametrize("overrides", [
+    dict(incoterm=Incoterm.DAP), dict(incoterm=Incoterm.DPU), dict(incoterm=Incoterm.DDP),
+    dict(destination_country="DE", destination_port="DEHAM", delivery_postcode="20095"),
+])
+def test_dap_and_eu_imports_are_notes_never_review(overrides):
+    t = triage(_fcl(**overrides))
+    assert t.status == "quote" and t.reasons == [] and t.notes
 
 
 def test_port_health_note(fake_llm):
     t = triage(extract_enquiry(sample_text("I06"), llm=fake_llm))
-    assert t.status == "quote" and any("port health" in r for r in t.reasons)
+    assert t.status == "quote" and any("port health" in r for r in t.notes)
 
 
 # ---------- need_info ----------
@@ -222,7 +237,7 @@ def _eu(**overrides) -> Enquiry:
 
 def test_eu_import_quotable_with_note():
     t = triage(_eu())
-    assert t.status == "quote" and any("EU import" in r for r in t.reasons)
+    assert t.status == "quote" and any("EU import" in r for r in t.notes)
 
 
 def test_eu_island_is_manual():
@@ -252,8 +267,8 @@ def test_i12_france_dap(fake_llm):
     assert e.destination_port is None and e.origin_country is None   # nothing assumed
     assert t.status == "need_info"
     assert t.missing_fields == ["port of arrival (discharge port)"]
-    assert any("Email the importer" in r for r in t.reasons)
-    assert TriageFlag.HEAVY_CONTAINER in t.flags
+    assert any("Email the importer" in r for r in t.notes)
+    assert TriageFlag.HEAVY_CONTAINER not in t.flags and t.reasons == []
 
 
 # ---------- clearance flags from the email ----------
