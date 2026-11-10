@@ -32,4 +32,6 @@ pytest
 - [x] Phase 3.1 – direction from countries, customer role, UK **and EU-27** destinations (mock EU sheets via `scripts/make_eu_mock_data.py`)
 - [x] Phase 4 – pricing (`src/quote.py`, `src/pipeline.py`): destination services, UK + EU, FCL
 - [x] Real Lincoln Cargo tariff for **Germany & France** (`data/tariffs/eu_de_fr.yaml`: EUR, no markup, same at every port, terms on the quote). Other countries still use MOCK sheets.
+- [x] Haulage + fuel always priced as **Maersk carrier haulage** (`data/haulage/maersk.yaml`; update the fuel % when Maersk changes it, staff are warned after 14 days)
+- [x] **Staff Maersk look-up step:** for DE/FR deliveries `try_email` prints exactly what to enter in Maersk's inland price look-up, asks for the haulage / fuel % / extra inland charges, re-prices and saves the quote (skip = quote marked ESTIMATE). Or pass `--haulage 650 --fuel 7.2 --extra "Toll=35"`.
 - [x] Quote saved as a text file in `quotes/` (git-ignored) by `python -m src.try_email` (`zones.py`, `rates.py`, `quote.py`)

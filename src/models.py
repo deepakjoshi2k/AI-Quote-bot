@@ -169,6 +169,7 @@ class Quote(BaseModel):
     exclusions: list[str]                  # always includes duties & import VAT
     terms: list[str] = Field(default_factory=list)   # tariff terms & conditions printed on the quote
     source: str = ""                       # which rate data priced it
+    haulage_estimate: bool = False         # True until staff enter the Maersk look-up figures
     is_mock: bool = True
 
 
