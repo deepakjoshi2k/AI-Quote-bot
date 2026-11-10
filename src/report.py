@@ -81,6 +81,8 @@ def format_quote(q: Quote) -> str:
               "", f"  Valid for {q.validity_days} days.", "  Assumptions:"]
     lines += [f"    - {a}" for a in q.assumptions]
     lines += ["  Not included:"] + [f"    - {x}" for x in q.exclusions]
+    if q.internal_notes:
+        lines += ["", "  INTERNAL – staff only, NOT on the customer quote:"] + [f"    - {x}" for x in q.internal_notes]
     return "\n".join(lines)
 
 
