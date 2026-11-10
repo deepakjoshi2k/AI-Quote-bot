@@ -22,7 +22,7 @@ def _fcl(**overrides) -> Enquiry:
     ("I03", 1000.00, 1150.00),   # LGP DTHC 250 + DO 65 + customs 65 + haulage zone 2 620
     ("I06", 1290.00, 1483.50),   # FXT DTHC 245 + DO 65 + haulage zone 3 980 (no customs asked)
     ("I07", 65.00, 74.75),       # customs clearance only
-    ("I12", 1308.20, 1308.20),   # France DAP, real DE/FR tariff (EUR, no markup), see test_france_email_tariff
+    ("I12", 1495.90, 1495.90),   # France DAP, DE/FR tariff (EUR, no margin), see test_france_email_tariff
 ])
 def test_sample_totals(sid, subtotal, total, fake_llm):
     r = run_enquiry(sample_text(sid), llm=fake_llm, log=False)
@@ -88,17 +88,18 @@ def test_france_email_tariff(fake_llm):
     assert r.triage.status == "quote"            # same charges at every French port: port not needed
     q = r.quote
     assert q.currency == "EUR" and q.margin == 0 and not q.is_mock
-    # THC 290 + Doc 50 + Sec 25 + Lo/Lo 90 + haulage 720 + fuel 18.5% of 720 (133.20) = 1308.20
+    # THC 290 + Doc 50 + Sec 25 + Lo/Lo 90 = 455
+    # Road haulage (ESTIMATE) = Maersk 720 + Maersk fuel 18.5% (133.20) = 853.20; our fuel 22% = 187.70
     assert [(l.code, l.amount) for l in q.lines] == [
-        ("THC", 290.0), ("DOC", 50.0), ("SEC", 25.0), ("LOLO", 90.0), ("HAUL", 720.0), ("HAUL-FUEL", 133.2)]
-    assert q.total == pytest.approx(1308.20)
+        ("THC", 290.0), ("DOC", 50.0), ("SEC", 25.0), ("LOLO", 90.0), ("HAUL", 853.2), ("HAUL-FUEL", 187.7)]
+    assert q.total == pytest.approx(1495.90)
     assert any("non-hazardous" in t for t in q.terms) and any("French import VAT" in t for t in q.terms)
 
 
 def test_same_charges_any_port_in_country(fake_llm):
     e = run_enquiry(sample_text("I12"), llm=fake_llm, log=False).enquiry
     totals = {price(e.model_copy(update={"destination_port": p})).total for p in [None, "FRLEH", "FRFOS"]}
-    assert totals == {1308.20}
+    assert totals == {1495.90}
 
 
 def test_germany_two_heavy_containers_with_customs():
@@ -106,9 +107,9 @@ def test_germany_two_heavy_containers_with_customs():
              containers=[ContainerLine(container_type="40HC", quantity=2)], total_gross_weight_kg=50000,
              customs_clearance_requested=True)
     q = price(e)
-    # per container 25 t > 23 t: THC 2x290 + Doc 50 + Sec 2x25 + Lo/Lo 2x90 + Customs 150
-    #   + haulage 2x720 + fuel 2x133.20 + heavy 2x200 + fuel 2x37 = 3190.40
-    assert q.total == pytest.approx(580 + 50 + 50 + 180 + 150 + 1440 + 266.4 + 400 + 74)
+    # per container 25 t > 23 t: THC 2x290 + Doc 50 + Sec 2x25 + Lo/Lo 2x90 + Customs 150 = 1010
+    #   + road haulage 2 x 853.20 (estimate) + fuel 22% (375.408) + heavy 2x200 + fuel 22% (88) = 3579.81
+    assert q.total == pytest.approx(3579.81)
     assert any("Import VAT 19% (Germany)" in t for t in q.terms)
 
 
@@ -176,7 +177,7 @@ def test_quote_text_file(fake_llm, tmp_path):
     r = run_enquiry(sample_text("I12"), llm=fake_llm, log=False)
     text = render_quote_text(r.enquiry, r.quote, r.triage, today=date(2026, 11, 10))
     assert "IMPORT QUOTATION" in text and "MOCK" not in text
-    assert "TOTAL EUR" in text and "1,308.20" in text
+    assert "TOTAL EUR" in text and "1,495.90" in text
     assert "Valid until:   24 Nov 2026" in text
     assert "TERMS AND CONDITIONS" in text and "PLEASE ALSO CONFIRM" in text
     path = save_quote_text(text, folder=tmp_path, stamp="test")
@@ -198,19 +199,20 @@ def _fr(**kw):
     return _fcl(**base)
 
 
-def test_haulage_is_maersk_cost_with_neutral_labels():
+def test_one_haulage_line_plus_22pct_fuel():
     q = price(_fr())
     haul = [l for l in q.lines if l.section == "Delivery"]
-    assert [(l.code, l.description) for l in haul] == [("HAUL", "Road haulage"), ("HAUL-FUEL", "Fuel surcharge")]
+    assert [(l.code, l.description) for l in haul] == [("HAUL", "Road haulage"), ("HAUL-FUEL", "Fuel surcharge 22%")]
+    assert haul[1].amount == pytest.approx(round(haul[0].amount * 0.22, 2))
     assert q.haulage_estimate and any("ESTIMATE" in n and "Maersk" in n for n in q.internal_notes)
 
 
 def test_new_maersk_fuel_rate_changes_price(monkeypatch):
     from src.haulage import carrier_haulage as real
     monkeypatch.setattr("src.quote.carrier_haulage", lambda c: {**real(c), "fuel_pct": 10.0})
-    q = price(_fr())   # estimate path: fuel amount = file % x haulage
-    # 455 tariff + 720 haulage + 10% fuel (72) = 1247
-    assert q.total == pytest.approx(1247.0)
+    q = price(_fr())   # estimate path: Maersk fuel amount = file % x haulage
+    # 455 tariff + road haulage (720 + 10% = 792) + our fuel 22% (174.24) = 1421.24
+    assert q.total == pytest.approx(1421.24)
 
 
 def test_stale_maersk_fuel_warns_staff(monkeypatch):
