@@ -28,6 +28,12 @@ class FakeLLM:
         return "fake text"
 
 
+@pytest.fixture(autouse=True)
+def no_markup_by_default(monkeypatch):
+    """Tests start with no hidden markup, whatever is in the developer's .env (tests can override)."""
+    monkeypatch.setenv("HAULAGE_MARKUP_PCT", "0")
+
+
 @pytest.fixture
 def fake_llm():
     return FakeLLM()

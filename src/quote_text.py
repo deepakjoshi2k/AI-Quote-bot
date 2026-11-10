@@ -35,7 +35,7 @@ def render_quote_text(e: Enquiry, q: Quote, t: Triage | None = None, today: date
         "=" * WIDTH,
         "LINCOLN CARGO – IMPORT QUOTATION" + ("   [MOCK RATES – PROTOTYPE]" if q.is_mock else ""),
         "Draft for staff review – not sent",
-        *(["*** HAULAGE IS AN ESTIMATE – check the Maersk inland price look-up before sending ***"]
+        *(["*** STAFF: HAULAGE IS AN ESTIMATE – confirm the haulage price, then remove this line ***"]
           if q.haulage_estimate else []),
         "=" * WIDTH,
         f"Date:          {today:%d %b %Y}",

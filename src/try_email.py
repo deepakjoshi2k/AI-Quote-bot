@@ -9,7 +9,8 @@ maersk.com, then enter the haulage and fuel you see. The quote is re-priced and 
 quotes/quote-<date-time>.txt. Skip (press Enter) and the quote is saved marked as an ESTIMATE.
 
 You can also pass the figures directly:
-    python -m src.try_email email.txt --haulage 650 --fuel 7.2 --extra "Toll=35" --heavy 0
+    python -m src.try_email email.txt --haulage 650 --fuel 46.80 --extra "Toll=35" --heavy 0
+    (--fuel is the fuel surcharge AMOUNT per container. The hidden markup comes from HAULAGE_MARKUP_PCT in .env.)
 """
 from __future__ import annotations
 
@@ -48,7 +49,7 @@ def ask_for_check(heavy_possible: bool) -> HaulageCheck | None:
     haulage = _ask_number("Maersk haulage per container, IHI (EUR) [Enter = skip, keep ESTIMATE]: ")
     if haulage is None:
         return None
-    fuel = _ask_number("Maersk import fuel surcharge, IFS (%) : ", allow_blank=False)
+    fuel = _ask_number("Maersk import fuel surcharge per container, IFS (EUR amount, not %): ", allow_blank=False)
     extras: list[tuple[str, float]] = []
     print("Other mandatory inland charges per container, as Name=amount (Enter on an empty line to finish):")
     while True:
@@ -61,18 +62,18 @@ def ask_for_check(heavy_possible: bool) -> HaulageCheck | None:
             print(f"  {err}")
     heavy = None
     if heavy_possible:
-        heavy = _ask_number("Heavy/weight surcharge per container from Maersk (EUR, 0 if included) "
-                            "[Enter = use our 200]: ")
-    return HaulageCheck(haulage_per_container=haulage, fuel_pct=fuel, extras=extras, heavy_surcharge=heavy)
+        heavy = _ask_number("Heavy/weight surcharge per container incl. its fuel (EUR, 0 if included) "
+                            "[Enter = use our 200 + fuel]: ")
+    return HaulageCheck(haulage_per_container=haulage, fuel_per_container=fuel, extras=extras, heavy_surcharge=heavy)
 
 
 def main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("file", nargs="?", help="email text file (omit to paste)")
     ap.add_argument("--haulage", type=float, help="Maersk haulage per container (EUR)")
-    ap.add_argument("--fuel", type=float, help="Maersk import fuel surcharge (%%)")
+    ap.add_argument("--fuel", type=float, help="Maersk import fuel surcharge per container (EUR amount, not %%)")
     ap.add_argument("--extra", type=_parse_extra, action="append", default=[], help="other inland charge, Name=amount")
-    ap.add_argument("--heavy", type=float, help="heavy surcharge per container from Maersk (0 if included)")
+    ap.add_argument("--heavy", type=float, help="heavy surcharge per container incl. fuel (0 if included)")
     ap.add_argument("--no-prompt", action="store_true", help="don't ask for Maersk figures")
     args = ap.parse_args(argv)
 
@@ -104,6 +105,9 @@ def main(argv: list[str]) -> None:
         if check:
             quote = price(r.enquiry, haulage_check=check)
             print(f"\nRe-priced with Maersk figures: TOTAL {quote.currency} {quote.total:,.2f}")
+            print("INTERNAL – staff only, NOT on the customer quote:")
+            for note in quote.internal_notes:
+                print(f"  - {note}")
         else:
             print("\nNo Maersk figures entered: quote saved as an ESTIMATE.")
 

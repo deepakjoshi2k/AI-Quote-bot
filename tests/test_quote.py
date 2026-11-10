@@ -198,18 +198,17 @@ def _fr(**kw):
     return _fcl(**base)
 
 
-def test_haulage_is_maersk():
+def test_haulage_is_maersk_cost_with_neutral_labels():
     q = price(_fr())
     haul = [l for l in q.lines if l.section == "Delivery"]
-    assert [l.code for l in haul] == ["HAUL", "HAUL-FUEL"]
-    assert all("Maersk" in l.description for l in haul)
-    assert q.haulage_estimate and any("HAULAGE IS AN ESTIMATE" in a for a in q.assumptions)
+    assert [(l.code, l.description) for l in haul] == [("HAUL", "Road haulage"), ("HAUL-FUEL", "Fuel surcharge")]
+    assert q.haulage_estimate and any("ESTIMATE" in n and "Maersk" in n for n in q.internal_notes)
 
 
 def test_new_maersk_fuel_rate_changes_price(monkeypatch):
     from src.haulage import carrier_haulage as real
     monkeypatch.setattr("src.quote.carrier_haulage", lambda c: {**real(c), "fuel_pct": 10.0})
-    q = price(_fr())
+    q = price(_fr())   # estimate path: fuel amount = file % x haulage
     # 455 tariff + 720 haulage + 10% fuel (72) = 1247
     assert q.total == pytest.approx(1247.0)
 

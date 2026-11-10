@@ -48,13 +48,26 @@ COUNTRY_NAMES = {"FR": "France", "DE": "Germany"}
 
 @dataclass
 class HaulageCheck:
-    """What staff read off Maersk's inland price look-up for this shipment (per container, in EUR)."""
+    """What staff read off Maersk's inland price look-up for this shipment (per container, in EUR, COST)."""
     haulage_per_container: float
-    fuel_pct: float
+    fuel_per_container: float                                        # fuel surcharge AMOUNT, not %
     extras: list[tuple[str, float]] = field(default_factory=list)   # other inland charges per container
-    heavy_surcharge: float | None = None   # None = use our file's surcharge if heavy; 0 = none
+    heavy_surcharge: float | None = None   # incl. its fuel. None = our file's surcharge if heavy; 0 = none
     checked_on: date = field(default_factory=date.today)
     source: str = "Maersk inland price look-up"
+
+
+def haulage_markup_pct() -> float:
+    """Hidden markup % on (haulage + fuel), from .env HAULAGE_MARKUP_PCT. Never shown to customers and
+    never stored in the repo (the repo is public)."""
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    raw = os.getenv("HAULAGE_MARKUP_PCT", "").strip().rstrip("%")
+    try:
+        return float(raw) if raw else 0.0
+    except ValueError:
+        raise ValueError(f"HAULAGE_MARKUP_PCT in .env must be a number, got {raw!r}") from None
 
 
 def needs_lookup(e) -> bool:
@@ -104,9 +117,9 @@ def lookup_instructions(e, today: date | None = None) -> str:
     out += ["",
             "  From the result page, note PER CONTAINER (EUR):",
             "   a) Inland haulage import (IHI) – the haulage price",
-            "   b) Import fuel surcharge (IFS) – the %",
+            "   b) Import fuel surcharge (IFS) – the AMOUNT in EUR per container (not the %)",
             "   c) Any other mandatory inland charges listed (name + amount)",
-            f"   d) If over {h['heavy_over_kg'] / 1000:g} t: the heavy/weight surcharge (or 0 if the haulage price already covers the weight band)" if h else "",
+            f"   d) If over {h['heavy_over_kg'] / 1000:g} t: the heavy/weight surcharge incl. its fuel (or 0 if the haulage price already covers the weight band)" if h else "",
             "",
             "  Then enter them below (or re-run with --haulage / --fuel / --extra / --heavy)."]
     return "\n".join(x for x in out if x is not None)

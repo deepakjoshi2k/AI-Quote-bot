@@ -170,6 +170,7 @@ class Quote(BaseModel):
     terms: list[str] = Field(default_factory=list)   # tariff terms & conditions printed on the quote
     source: str = ""                       # which rate data priced it
     haulage_estimate: bool = False         # True until staff enter the Maersk look-up figures
+    internal_notes: list[str] = Field(default_factory=list)  # STAFF ONLY: cost, markup. Never on the customer quote
     is_mock: bool = True
 
 

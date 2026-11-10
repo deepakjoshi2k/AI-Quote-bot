@@ -15,7 +15,7 @@ from __future__ import annotations
 from src.config import load_config
 from src.models import Enquiry, Quote, QuoteLine, Service
 from src.rates import RateBook, delivery_rate, destination_charge, load_rate_book
-from src.haulage import HaulageCheck, carrier_haulage
+from src.haulage import HaulageCheck, carrier_haulage, haulage_markup_pct
 from src.scope import quote_scope
 from src.tariff import tariff_for, terms_for
 from src.zones import zone_for_address
@@ -70,35 +70,46 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict, check: HaulageCheck | Non
         lines.append(_line(section_of[ch["applies"]], ch["code"], ch["description"], _BASIS[ch["basis"]],
                            qty, ch["amount"]))
 
-    # Carrier haulage: always Maersk. Checked figures from staff (Maersk inland price look-up) win;
-    # otherwise the flat estimate from data/haulage/maersk.yaml, clearly labelled ESTIMATE.
+    # Carrier haulage: always Maersk COST (staff look-up, else the flat estimate in data/haulage/maersk.yaml)
+    # + hidden markup (HAULAGE_MARKUP_PCT in .env) on haulage + fuel. The customer sees only selling prices,
+    # with neutral labels: no carrier name, no fuel %, no markup.
     heavy = False
     h = None
     estimate = False
+    internal: list[str] = []
     if scope.delivery:
         h = carrier_haulage(e.destination_country)
         if h is None:
             raise PricingError(f"No Maersk haulage rate for {e.destination_country}.")
         carrier = h["carrier"]
         if check:
-            base, fuel = check.haulage_per_container, check.fuel_pct
-            tag = f"{carrier} carrier haulage, checked {check.checked_on:%d %b %Y}"
+            base, fuel_amt = check.haulage_per_container, check.fuel_per_container
+            internal.append(f"Haulage cost from the {check.source} on {check.checked_on:%d %b %Y}.")
         else:
-            base, fuel = h["haulage_per_container"], h["fuel_pct"]
-            tag = f"{carrier} carrier haulage – ESTIMATE"
+            base = h["haulage_per_container"]
+            fuel_amt = base * h["fuel_pct"] / 100
             estimate = True
-        lines.append(_line("Delivery", "HAUL", f"Road haulage ({tag})", "per container", n, base))
-        lines.append(_line("Delivery", "HAUL-FUEL", f"{carrier} fuel surcharge {fuel:g}% (haulage)",
-                           f"{fuel:g}% of {base:.2f} per container", n, base * fuel / 100))
+            internal.append(f"ESTIMATE: flat {carrier} haulage {base:.2f} + fuel {h['fuel_pct']:g}% "
+                            f"(updated {h['fuel_updated']}). Check the {carrier} inland price look-up.")
+        markup = haulage_markup_pct()
+        k = 1 + markup / 100
+        lines.append(_line("Delivery", "HAUL", "Road haulage", "per container", n, base * k))
+        lines.append(_line("Delivery", "HAUL-FUEL", "Fuel surcharge", "per container", n, fuel_amt * k))
+        cost = (base + fuel_amt) * n
+        internal.append(f"{carrier} cost per container: haulage {base:.2f} + fuel {fuel_amt:.2f} = {base + fuel_amt:.2f}"
+                        f" (x{n} = {cost:.2f}).")
+        internal.append(f"Hidden markup {markup:g}% on haulage + fuel = {cost * markup / 100:.2f}; "
+                        f"customer sees {cost * k:.2f}.")
         for name, amount in (check.extras if check else []):
-            lines.append(_line("Delivery", "INLAND", f"{carrier} inland charge: {name}", "per container", n, amount))
+            lines.append(_line("Delivery", "INLAND", name, "per container", n, amount))
         heavy = per_container_kg is not None and per_container_kg > h["heavy_over_kg"]
-        heavy_amount = h["heavy_surcharge"] if (check is None or check.heavy_surcharge is None) else check.heavy_surcharge
+        if check is None or check.heavy_surcharge is None:
+            heavy_amount = h["heavy_surcharge"] * (1 + h["fuel_pct"] / 100)   # our tariff: EUR 200 + fuel
+        else:
+            heavy_amount = check.heavy_surcharge                              # staff figure, incl. fuel
         if heavy and heavy_amount:
-            lines.append(_line("Delivery", "HEAVY", f"Heavy container surcharge (over {h['heavy_over_kg'] / 1000:g} t)",
-                               "per container", n, heavy_amount))
-            lines.append(_line("Delivery", "HEAVY-FUEL", f"{carrier} fuel surcharge {fuel:g}% (heavy surcharge)",
-                               f"{fuel:g}% of {heavy_amount:.2f} per container", n, heavy_amount * fuel / 100))
+            lines.append(_line("Delivery", "HEAVY", f"Heavy container surcharge (over {h['heavy_over_kg'] / 1000:g} t), "
+                               "incl. fuel", "per container", n, heavy_amount))
 
     if not lines:
         raise PricingError("Nothing to price for this enquiry.")
@@ -111,13 +122,8 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict, check: HaulageCheck | Non
         assumptions.append("Priced for 1 bill of lading.")
     if scope.import_clearance:
         assumptions.append("Priced for 1 house bill of lading (customs).")
-    if h is not None and check is not None:
-        assumptions.append(f"Haulage and fuel from the {check.source} on {check.checked_on:%d %b %Y}.")
-    elif h is not None:
-        assumptions.append(f"HAULAGE IS AN ESTIMATE (flat {h['carrier']} rate, fuel {h['fuel_pct']:g}% updated "
-                           f"{h['fuel_updated']}): check the {h['carrier']} inland price look-up before sending.")
-        if per_container_kg is None:
-            assumptions.append(f"Weight not stated: heavy surcharge applies if over {h['heavy_over_kg'] / 1000:g} t per container.")
+    if h is not None and per_container_kg is None:
+        assumptions.append(f"Weight not stated: heavy surcharge applies if over {h['heavy_over_kg'] / 1000:g} t per container.")
     exclusions = ["Import duty and import VAT (at cost)", "Ocean freight and origin charges"]
     if not scope.import_clearance:
         exclusions.insert(0, "Customs clearance (available on request)")
@@ -137,6 +143,7 @@ def _price_tariff(e: Enquiry, tariff: dict, cfg: dict, check: HaulageCheck | Non
         validity_days=cfg["validity_days"], assumptions=assumptions, exclusions=exclusions,
         terms=terms_for(tariff, country, ddp=e.incoterm is Incoterm.DDP),
         source=tariff["name"], is_mock=tariff.get("is_mock", False), haulage_estimate=estimate,
+        internal_notes=internal,
     )
 
 
