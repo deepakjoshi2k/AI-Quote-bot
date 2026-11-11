@@ -5,6 +5,7 @@
 
 Layout (same style for every section, see section()):
     SHIPMENT DETAILS  ->  DECISION: QUOTE / EMAIL SENDER / MANUAL REVIEW  ->  (ports, Maersk look-up, quote)
+    (try_email clears the working steps - ports list, Maersk look-up - once the quote is made)
     ->  NOTES FOR STAFF: Incoterm · Sender asked · Agent actions (done / to do) · To check
 """
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 import textwrap
 
 from src.models import Enquiry, Incoterm, Quote, Service, Triage
-from src.scope import clearance_note, describe_scope, quote_scope
+from src.scope import clearance_note
 
 NA = "Not available"
 NR = "Not relevant"
@@ -127,12 +128,7 @@ def format_details(e: Enquiry) -> str:
 # ---------- 2. decision ----------
 
 def format_decision(e: Enquiry, t: Triage) -> str:
-    lines = [banner(f"DECISION: {DECISIONS[t.status]}")]
-    if t.status != "manual_review":
-        lines += ["", section("QUOTE COVERS")]
-        lines += [f"  • {item}" for item in describe_scope(quote_scope(e))]
-        lines += ["  • Not included: import duty and VAT (at cost)"]
-    return "\n".join(lines)
+    return banner(f"DECISION: {DECISIONS[t.status]}")
 
 
 def format_result(e: Enquiry, t: Triage, q: Quote | None = None) -> str:

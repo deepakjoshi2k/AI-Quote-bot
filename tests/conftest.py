@@ -52,3 +52,10 @@ def no_road_service(monkeypatch):
         raise d.DistanceError("ORS disabled in tests")
 
     monkeypatch.setattr(d, "default_service", _no_ors)
+
+
+@pytest.fixture(autouse=True)
+def no_clear_screen(monkeypatch):
+    """try_email clears the terminal when a quote is done; never in tests."""
+    import src.try_email as te
+    monkeypatch.setattr(te, "clear_screen", lambda: print("<<CLEAR SCREEN>>"))

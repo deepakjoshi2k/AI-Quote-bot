@@ -219,7 +219,8 @@ def test_cli_autofills_nearest_priced_port(monkeypatch, fake_llm, tmp_path, caps
     out = capsys.readouterr().out
     assert "NEAREST PORTS BY ROAD" in out and "1. Antwerp (BEANR, BE)  100 km" in out
     assert "Auto-filled the nearest port we can price: FRLEH" in out
-    assert "Le Havre (FRLEH) – NOT IN EMAIL: nearest by road, 200 km" in out
+    assert "[x] Port Le Havre (FRLEH) chosen – 200 km by road (not in the email)" in " ".join(out.split())
+    assert "MAERSK INLAND" not in out                              # figures given as options: no look-up box
     saved = (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
     assert "1,305.10" in saved and "Le Havre" in saved
 
@@ -293,7 +294,7 @@ def test_i13_staff_picks_port_and_quotes(monkeypatch, fake_llm, tmp_path, capsys
     te = _cli13(monkeypatch, fake_llm, tmp_path)
     te.main(["data/sample_enquiries/I13.txt", "--ports", "Hamburg", "--haulage", "650", "--fuel", "46.80"])
     out = capsys.readouterr().out
-    assert "Hamburg (DEHAM) – NOT IN EMAIL" in out
+    assert "[x] Port Hamburg (DEHAM) chosen – 793 km by road (not in the email)" in " ".join(out.split())
     saved = (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
     assert "quoted via Hamburg (DEHAM); please confirm the port the container is booked into" in saved
     assert saved.count("ort of arrival") == 1                      # the open question is replaced, not repeated

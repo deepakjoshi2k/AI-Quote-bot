@@ -73,3 +73,49 @@ def test_cli_notes_for_staff_come_last(monkeypatch, fake_llm, tmp_path, capsys):
     out = capsys.readouterr().out
     assert out.index("DECISION: QUOTE") < out.index("── QUOTE (") < out.index("── NOTES FOR STAFF")
     assert "[x] Quote drafted via Le Havre (FRLEH): EUR 1,305.10" in _flat(out)
+
+
+# ---------- clean final screen (working steps cleared once the quote is done) ----------
+
+def _cli(monkeypatch, fake_llm, tmp_path, answers):
+    import src.distance as d
+    import src.quote_text as qt
+    import src.try_email as te
+    from tests.test_distance import FakeRoutes
+    real = te.run_enquiry
+    monkeypatch.setattr(te, "run_enquiry", lambda text: real(text, llm=fake_llm, log=False))
+    monkeypatch.setattr(te, "save_quote_text", lambda text, stamp=None: qt.save_quote_text(text, folder=tmp_path,
+                                                                                           stamp="t"))
+    monkeypatch.setattr(d, "default_service", lambda: FakeRoutes(override={"FRLEH": 200.0, "FRDKK": 210.0}))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    it = iter(answers)
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(it))
+    return te
+
+
+def test_steps_cleared_after_quote(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _cli(monkeypatch, fake_llm, tmp_path, ["1", "2300", "22", ""])
+    te.main(["data/sample_enquiries/I12.txt"])
+    out = capsys.readouterr().out
+    before, final = out.split("<<CLEAR SCREEN>>")
+    assert "MAERSK INLAND PRICE LOOK-UP" in before and "NEAREST PORTS" in before     # working steps
+    assert "MAERSK INLAND" not in final and "NEAREST PORTS" not in final and "QUOTE COVERS" not in final
+    assert final.index("SHIPMENT DETAILS") < final.index("DECISION: QUOTE") < final.index("── QUOTE (") \
+        < final.index("NOTES FOR STAFF")
+    assert "EUR   3,287.84" in final
+    assert "[x] Port Le Havre (FRLEH) chosen – 200 km by road" in _flat(final)
+
+
+def test_steps_kept_when_quote_not_made(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _cli(monkeypatch, fake_llm, tmp_path, ["1", ""])          # port chosen, Maersk figures skipped
+    te.main(["data/sample_enquiries/I12.txt"])
+    out = capsys.readouterr().out
+    assert "<<CLEAR SCREEN>>" not in out and "MAERSK INLAND PRICE LOOK-UP" in out   # still needed
+    assert "[ ] Le Havre (FRLEH): no quote yet" in _flat(out)
+
+
+def test_keep_steps_flag(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _cli(monkeypatch, fake_llm, tmp_path, ["1", "2300", "22", ""])
+    te.main(["data/sample_enquiries/I12.txt", "--keep-steps"])
+    out = capsys.readouterr().out
+    assert "<<CLEAR SCREEN>>" not in out and "MAERSK INLAND PRICE LOOK-UP" in out

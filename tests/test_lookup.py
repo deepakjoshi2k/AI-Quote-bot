@@ -107,7 +107,7 @@ def test_cli_flags(monkeypatch, fake_llm, tmp_path, capsys):
     te = _patch_run(monkeypatch, fake_llm, tmp_path)
     te.main(["data/sample_enquiries/I12.txt", "--haulage", "650", "--fuel", "46.80"])
     out = capsys.readouterr().out
-    assert out.index("MAERSK INLAND PRICE LOOK-UP") < out.index("── QUOTE (")   # look-up first, then the price
+    assert "MAERSK INLAND PRICE LOOK-UP" not in out                 # figures given as options: no box needed
     assert "1,305.10" in out
     assert "1,305.10" in (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
 
