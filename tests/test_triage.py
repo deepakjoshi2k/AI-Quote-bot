@@ -338,4 +338,4 @@ def test_report_relevance(fake_llm):
     e = extract_enquiry(sample_text("I12"), llm=fake_llm)
     out = format_result(e, triage(e))
     assert "Not relevant" in out and "No (not stated)" in out and "FRLEH" not in out
-    assert "DECISION: QUOTE" in out and "QUOTE COVERS" in out
+    assert "DECISION: QUOTE" in out and "QUOTE COVERS" not in out

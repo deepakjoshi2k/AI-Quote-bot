@@ -15,7 +15,10 @@ No port of arrival in the email? It shows the 3 nearest container ports BY ROAD 
 Pick another port or several (one quote per port):
     python -m src.try_email email.txt --ports 1,2        # numbers from the list, or LOCODEs: --ports FRLEH,DEHAM
 
-You can also pass the figures directly:
+When the quote is done, the screen is cleared and shows only: details, decision, quote(s), notes for staff
+(the port list and Maersk look-up box were working steps). --keep-steps keeps them on screen.
+
+You can also pass the figures directly (then no look-up box is shown):
     python -m src.try_email email.txt --haulage 650 --fuel 46.80 --extra "Toll=35" --heavy 0
     (--fuel is Maersk's fuel AMOUNT per container. The customer sees one "Road haulage" line = haulage + Maersk fuel,
      then "Fuel surcharge 22%" on top of it.)
@@ -23,6 +26,7 @@ You can also pass the figures directly:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -193,8 +197,13 @@ def choose_ports(e: Enquiry, args, interactive: bool, auto: bool = True,
                   "quote this port manually.")
             if todo is not None:
                 todo.append(f"{PORT_NAMES.get(code, code)} ({code}): quote manually – no tariff for {code[:2]} yet")
-    notes = {c: (f"nearest by road, {km[c]:,.0f} km (staff choice)" if c in km else "staff choice") for c in keep if c}
+    notes = {c: (f"{km[c]:,.0f} km by road" if c in km else "") for c in keep if c}
     return keep, notes
+
+
+def clear_screen() -> None:
+    """Clear the terminal (Windows: cls)."""
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 def get_check(args, ap, e: Enquiry, interactive: bool) -> HaulageCheck | None:
@@ -220,6 +229,8 @@ def main(argv: list[str]) -> None:
     ap.add_argument("--no-prompt", action="store_true", help="don't ask for Maersk figures")
     ap.add_argument("--estimate", action="store_true",
                     help="make the quote with the flat ESTIMATE haulage instead of asking for Maersk figures")
+    ap.add_argument("--keep-steps", action="store_true",
+                    help="don't clear the port list / Maersk look-up from the screen when the quote is done")
     args = ap.parse_args(argv)
 
     if args.file:
@@ -235,9 +246,18 @@ def main(argv: list[str]) -> None:
     done: list[str] = []        # what the agent did   -> NOTES FOR STAFF, "Agent actions [x]"
     todo: list[str] = []        # what staff must do   -> "Agent actions [ ]"
 
+    quote_views: list[str] = []  # the quotes as shown, for the clean final screen
+    steps_shown = False         # working steps (port prompt / Maersk look-up box) were typed into
+
     def finish(quotes: int = 0, ask: list[str] | None = None) -> None:
-        print()
-        print(format_staff_notes(e0, t0, done, quotes, ask, todo))
+        notes = format_staff_notes(e0, t0, done, quotes, ask, todo)
+        if steps_shown and quotes and not args.keep_steps:
+            # Job done: clear the working steps and show only details, decision, quote(s) and notes.
+            clear_screen()
+            print("\n\n".join([format_result(e0, t0)] + quote_views + [notes]))
+        else:
+            print()
+            print(notes)
 
     # When Maersk haulage is needed, show NO price until staff have entered the Maersk figures.
     print()
@@ -253,6 +273,7 @@ def main(argv: list[str]) -> None:
 
     can_ask = bool(args.file) and not args.no_prompt and sys.stdin.isatty()
     interactive = can_ask and not args.estimate
+    steps_shown = can_ask and not args.ports
     if staff_pick:
         print("\n  The email has no port of arrival and the sender did not ask us to suggest one.\n"
               "  The sender will be asked. To quote now, choose a port from the list below (Enter = just ask).")
@@ -278,9 +299,14 @@ def main(argv: list[str]) -> None:
             t = t.model_copy(update={"missing_fields": [
                 f"port of arrival: quoted via {name}; please confirm the port the container is booked into"]
                 + [m for m in t.missing_fields if "port of arrival" not in m]})
+        note = port_notes.get(port, "")
+        if chosen:
+            done.append(f"Port {name} chosen" + (f" – {note}" if note else " by staff") + " (not in the email)")
         if needs_lookup(e):
-            print()
-            print(lookup_instructions(e, port_note=port_notes.get(port)))
+            if args.haulage is None:            # figures typed in: show what to look up on maersk.com
+                print()
+                print(lookup_instructions(e, port_note=(f"{note} (staff choice)" if note else "staff choice") if chosen else None))
+                steps_shown = steps_shown or interactive
             check = get_check(args, ap, e, interactive)
             if check:
                 quote = price(e, haulage_check=check)
@@ -295,8 +321,9 @@ def main(argv: list[str]) -> None:
                 continue
         else:
             quote = price(e)
+        quote_views.append(format_quote(quote))
         print()
-        print(format_quote(quote))
+        print(quote_views[-1])
         text_out = render_quote_text(e, quote, t)
         # several ports -> one file per port: quote-<date-time>-<PORT>.txt
         path = save_quote_text(text_out, stamp=f"{stamp}-{port}") if len(ports) > 1 and port else save_quote_text(text_out)
