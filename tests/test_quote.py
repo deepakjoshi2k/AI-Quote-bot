@@ -220,7 +220,7 @@ def test_stale_maersk_fuel_warns_staff(monkeypatch):
     from src.haulage import carrier_haulage as real
     from src.triage import triage
     monkeypatch.setattr("src.triage.carrier_haulage", lambda c: {**real(c), "fuel_updated": date(2026, 1, 1)})
-    t = triage(_fr())
+    t = triage(_fr(destination_port="FRLEH"))
     assert t.status == "quote" and any("last updated" in n for n in t.notes)
 
 

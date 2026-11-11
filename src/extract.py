@@ -267,6 +267,7 @@ def normalise(raw: RawEnquiry, rate_book: RateBook | None = None) -> Enquiry:
         delivery_required=False if raw.clearance_only else raw.delivery_required,
         customs_clearance_requested=True if raw.clearance_only else raw.customs_clearance_requested,
         clearance_only=raw.clearance_only,
+        port_advice_requested=raw.port_advice_requested,
         delivery_postcode=postcode,
         delivery_place=raw.delivery_place,
         ready_date=raw.ready_date,
