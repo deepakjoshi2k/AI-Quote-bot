@@ -99,7 +99,7 @@ def _patch_run(monkeypatch, fake_llm, tmp_path):
     monkeypatch.setattr(te, "run_enquiry", lambda text: real(text, llm=fake_llm, log=False))
     monkeypatch.setattr("src.quote_text.QUOTES_DIR", tmp_path)
     import src.quote_text as qt
-    monkeypatch.setattr(te, "save_quote_text", lambda text: qt.save_quote_text(text, folder=tmp_path, stamp="t"))
+    monkeypatch.setattr(te, "save_quote_text", lambda text, stamp=None: qt.save_quote_text(text, folder=tmp_path, stamp="t" if stamp is None else "t-" + stamp.rsplit("-", 1)[-1]))
     return te
 
 
@@ -180,6 +180,6 @@ def test_staff_report_shows_breakdown():
 def test_fuel_pct_comes_from_tariff(monkeypatch):
     from src.tariff import tariff_for
     t = dict(tariff_for("FR")); t["haulage_fuel_surcharge_pct"] = 10
-    monkeypatch.setattr("src.quote.tariff_for", lambda c: t)
+    monkeypatch.setattr("src.quote.pricing_tariff", lambda p, c: t)
     q = price(_fr(), haulage_check=HaulageCheck(100.0, 20.0))
     assert {l.code: l.amount for l in q.lines}["HAUL-FUEL"] == 12.0

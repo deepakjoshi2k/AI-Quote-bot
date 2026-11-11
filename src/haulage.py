@@ -63,8 +63,9 @@ def needs_lookup(e) -> bool:
     return quote_scope(e).delivery and carrier_haulage(e.destination_country) is not None
 
 
-def lookup_instructions(e, today: date | None = None) -> str:
-    """Exactly what to type into Maersk's inland price look-up, filled from the enquiry."""
+def lookup_instructions(e, today: date | None = None, port_note: str | None = None) -> str:
+    """Exactly what to type into Maersk's inland price look-up, filled from the enquiry.
+    port_note: set when staff picked the port (not in the email), e.g. "nearest by road, 412 km"."""
     from src.quote import PORT_NAMES
     today = today or date.today()
     n = sum(c.quantity for c in e.containers)
@@ -73,6 +74,10 @@ def lookup_instructions(e, today: date | None = None) -> str:
     place = ", ".join(filter(None, [e.delivery_place, e.delivery_postcode])) or na
     if e.destination_port:
         port = f"{PORT_NAMES.get(e.destination_port, e.destination_port)} ({e.destination_port})"
+        if port_note:
+            port += f" – NOT IN EMAIL: {port_note}"
+        if e.destination_port[:2] != e.destination_country:
+            port += " [port in another country: check Maersk lists it for this inland location]"
     else:
         port = (f"{na} – choose the port Lincoln Cargo will use (e.g. "
                 + (", ".join(f"{PORT_NAMES[p]} {p}" for p in ['FRLEH', 'FRFOS']) if e.destination_country == "FR"

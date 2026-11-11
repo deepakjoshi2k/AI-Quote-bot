@@ -40,3 +40,15 @@ def expected():
 
 def sample_text(sid: str) -> str:
     return (SAMPLES / f"{sid}.txt").read_text(encoding="utf-8")
+
+
+@pytest.fixture(autouse=True)
+def no_road_service(monkeypatch):
+    """Tests never call OpenRouteService: the default service fails like a missing key.
+    Tests that need distances pass (or patch in) their own fake service."""
+    import src.distance as d
+
+    def _no_ors():
+        raise d.DistanceError("ORS disabled in tests")
+
+    monkeypatch.setattr(d, "default_service", _no_ors)

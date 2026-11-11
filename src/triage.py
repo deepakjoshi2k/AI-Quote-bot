@@ -16,7 +16,7 @@ from src.models import ChargeSections, Direction, Enquiry, Incoterm, Mode, Servi
 from src.rates import RateBook, load_rate_book
 from src.scope import clearance_note, quote_scope
 from src.haulage import carrier_haulage, fuel_age_days, fuel_is_stale
-from src.tariff import tariff_for
+from src.tariff import port_country, pricing_tariff, tariff_for
 from src.zones import MANUAL, zone_for_address
 
 
@@ -79,14 +79,30 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
         block(TriageFlag.MANUAL_DELIVERY_AREA, f"Delivery to {e.delivery_postcode} ({where}) needs a manual quote.")
 
     # 4. Destination port and delivery must be in our rate sheets (tariff countries: any port in the country).
-    tariff = tariff_for(e.destination_country)
-    if tariff:
-        if scope.destination_handling and e.destination_port and not e.destination_port.startswith(e.destination_country):
+    #    Tariff countries: the arrival port may be in another country (nearest port by road); its own
+    #    country's tariff prices the port charges, the delivery country's Maersk haulage prices delivery.
+    tariff = pricing_tariff(e.destination_port, e.destination_country)
+    port_cc = port_country(e.destination_port)
+    if (tariff_for(e.destination_country) or tariff) and e.destination_port:
+        if tariff is None and scope.destination_handling:
             block(TriageFlag.DESTINATION_PORT_NOT_IN_SHEET,
-                  f"Arrival port {e.destination_port} is not in {e.destination_country}: quote manually.")
-    elif scope.destination_handling and e.destination_port and e.destination_port not in rb.destination_ports():
-        block(TriageFlag.DESTINATION_PORT_NOT_IN_SHEET,
-              f"Arrival port {e.destination_port} is not in our rate sheet: quote manually or add its rates.")
+                  f"Arrival port {e.destination_port} is in {port_cc}: we have no tariff for {port_cc} yet. Quote manually.")
+        elif scope.delivery and carrier_haulage(e.destination_country) is None:
+            block(TriageFlag.LANE_NOT_IN_SHEET,
+                  f"Delivery in {e.destination_country} from {e.destination_port}: no haulage set-up for "
+                  f"{e.destination_country}. Quote manually.")
+        elif port_cc != e.destination_country:
+            info.append(f"Arrival port {e.destination_port} is in {port_cc}, delivery in {e.destination_country}: "
+                        f"port charges from the {port_cc} tariff. Check Maersk offers inland delivery from this port "
+                        "to the address, and where customs clearance will be done.")
+    elif tariff is None and scope.destination_handling and e.destination_port:
+        if e.destination_port not in rb.destination_ports():
+            block(TriageFlag.DESTINATION_PORT_NOT_IN_SHEET,
+                  f"Arrival port {e.destination_port} is not in our rate sheet: quote manually or add its rates.")
+        elif e.destination_country and port_cc != e.destination_country:
+            block(TriageFlag.DESTINATION_PORT_NOT_IN_SHEET,
+                  f"Arrival port {e.destination_port} is outside {e.destination_country}: "
+                  "the mock rate sheets only price ports in the delivery country. Quote manually.")
     if (not tariff and scope.delivery and e.destination_country not in (None, "GB") and e.destination_port
             and e.service is Service.FCL and e.delivery_postcode):
         zone = zone_for_address(e.destination_country, e.delivery_postcode)
