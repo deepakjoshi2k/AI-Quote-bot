@@ -108,7 +108,7 @@ def test_format_marks_ports_we_cannot_price():
     opts = [PortOption(next(x for x in p if x.locode == c), km, 5.0) for c, km in [("BEANR", 300), ("FRLEH", 412)]]
     text = format_options(VITRY, opts, {"BEANR": False, "FRLEH": True})
     assert "1. Antwerp (BEANR, BE)  300 km" in text
-    assert "manual quote" in text.splitlines()[1] and "manual" not in text.splitlines()[2]
+    assert "manual quote" in text.splitlines()[2] and "manual" not in text.splitlines()[3]
     assert "confirm the port" in text
 
 
@@ -280,12 +280,12 @@ def _cli13(monkeypatch, fake_llm, tmp_path):
 def test_i13_no_port_no_request_asks_sender_and_makes_no_quote(monkeypatch, fake_llm, tmp_path, capsys):
     te = _cli13(monkeypatch, fake_llm, tmp_path)
     te.main(["data/sample_enquiries/I13.txt", "--haulage", "650", "--fuel", "46.80"])
-    out = capsys.readouterr().out
-    assert "DECISION: NEED_INFO" in out and "Port of arrival the container is booked into" in out
-    assert "STAFF: the email has no port of arrival" in out
+    out = " ".join(capsys.readouterr().out.split())              # ignore line wrapping
+    assert "DECISION: EMAIL SENDER" in out
+    assert "[ ] Email the sender to ask: Port of arrival the container is booked into" in out
+    assert "no port of arrival and the sender did not ask us to suggest one" in out
     assert "NEAREST PORTS BY ROAD" in out
-    assert "Auto-filled" not in out                               # never filled in without being asked
-    assert "No port chosen: no quote made" in out
+    assert "Auto-filled" not in out and "[x]" not in out          # never filled in without being asked
     assert not list(tmp_path.glob("quote-*.txt"))
 
 
@@ -304,7 +304,8 @@ def test_i13_interactive_enter_means_just_ask(monkeypatch, fake_llm, tmp_path, c
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt="": "")
     te.main(["data/sample_enquiries/I13.txt"])
-    assert "No port chosen: no quote made" in capsys.readouterr().out
+    out = " ".join(capsys.readouterr().out.split())
+    assert "[ ] Email the sender to ask: Port of arrival" in out and "[x]" not in out
     assert not list(tmp_path.glob("quote-*.txt"))
 
 

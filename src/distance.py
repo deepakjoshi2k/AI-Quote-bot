@@ -175,12 +175,13 @@ def nearest_ports(country: str, postcode: str | None, place: str | None = None,
 def format_options(here: Located, options: list[PortOption], priced: dict[str, bool] | None = None) -> str:
     """Numbered list for staff, e.g. '1. Le Havre (FRLEH, FR)  412 km by road, ~5.6 h'."""
     priced = priced or {}
-    out = [f"=== NEAREST PORTS BY ROAD (lorry) to: {here.label} ==="]
+    from src.report import section
+    out = [section("NEAREST PORTS BY ROAD (lorry)"), f"  To: {here.label}"]
     for i, o in enumerate(options, 1):
         t = f", ~{o.hours:.1f} h" if o.hours is not None else ""
         flag = "" if priced.get(o.locode, True) else "   (no tariff for this port's country: manual quote)"
         out.append(f"  {i}. {o.port.name} ({o.locode}, {o.port.country})  {o.road_km:,.0f} km{t}{flag}")
-    out.append("  Not in the email: the sender is asked to confirm the port.")
+    out.append("  (Not in the email: the sender is asked to confirm the port.)")
     return "\n".join(out)
 
 

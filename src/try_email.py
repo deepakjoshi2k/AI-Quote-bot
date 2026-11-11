@@ -39,7 +39,7 @@ from src.pipeline import run_enquiry
 from src.quote import price
 from src.rates import load_rate_book
 from src.quote_text import render_quote_text, save_quote_text
-from src.report import format_quote, format_result
+from src.report import format_quote, format_result, format_staff_notes
 
 
 def _parse_extra(text: str) -> tuple[str, float]:
@@ -142,7 +142,8 @@ def suggest_ports(e: Enquiry) -> tuple[list[PortOption], str | None]:
     return options, default
 
 
-def choose_ports(e: Enquiry, args, interactive: bool, auto: bool = True) -> tuple[list[str | None], dict[str, str]]:
+def choose_ports(e: Enquiry, args, interactive: bool, auto: bool = True,
+                 todo: list[str] | None = None) -> tuple[list[str | None], dict[str, str]]:
     """Which arrival port(s) to quote. Returns (ports, notes per port).
     auto=True  (sender asked us to suggest a port): the nearest port we can price is filled in.
     auto=False (sender didn't ask): nothing is filled in; staff must choose, else no quote ([]).
@@ -179,7 +180,7 @@ def choose_ports(e: Enquiry, args, interactive: bool, auto: bool = True) -> tupl
         return [], {}
     elif default:
         ports = [default]
-        print(f"\nAuto-filled the nearest port we can price: {default} (use --ports to choose others).")
+        print(f"  Auto-filled the nearest port we can price: {default} (use --ports to choose others).")
     else:
         return [None], {}
 
@@ -188,8 +189,10 @@ def choose_ports(e: Enquiry, args, interactive: bool, auto: bool = True) -> tupl
         if can_price_port(e, code):
             keep.append(code)
         else:
-            print(f"\n{code}: no tariff for {code[:2]} (or no haulage for {e.destination_country}): "
+            print(f"  {code}: no tariff for {code[:2]} (or no haulage for {e.destination_country}): "
                   "quote this port manually.")
+            if todo is not None:
+                todo.append(f"{PORT_NAMES.get(code, code)} ({code}): quote manually – no tariff for {code[:2]} yet")
     notes = {c: (f"nearest by road, {km[c]:,.0f} km (staff choice)" if c in km else "staff choice") for c in keep if c}
     return keep, notes
 
@@ -229,41 +232,52 @@ def main(argv: list[str]) -> None:
     e0, t0 = r.enquiry, r.triage
     staff_pick = staff_can_choose_port(e0, t0)          # port missing, sender didn't ask us to suggest one
     lookup = (r.quote is not None or staff_pick) and needs_lookup(e0)
+    done: list[str] = []        # what the agent did   -> NOTES FOR STAFF, "Agent actions [x]"
+    todo: list[str] = []        # what staff must do   -> "Agent actions [ ]"
+
+    def finish(quotes: int = 0, ask: list[str] | None = None) -> None:
+        print()
+        print(format_staff_notes(e0, t0, done, quotes, ask, todo))
 
     # When Maersk haulage is needed, show NO price until staff have entered the Maersk figures.
     print()
-    print(format_result(e0, t0, None if lookup else r.quote))
+    print(format_result(e0, t0))
     if r.quote is None and not staff_pick:
-        return
+        return finish()
     if r.quote is not None and not lookup:
+        print()
+        print(format_quote(r.quote))
         path = save_quote_text(render_quote_text(e0, r.quote, t0))
-        print(f"\nQuote saved as a text file: {path}")
-        return
+        done.append(f"Quote drafted: {r.quote.currency} {r.quote.total:,.2f} – saved as {path}")
+        return finish(1)
 
     can_ask = bool(args.file) and not args.no_prompt and sys.stdin.isatty()
     interactive = can_ask and not args.estimate
     if staff_pick:
-        print("\nSTAFF: the email has no port of arrival and the sender did not ask us to suggest one.\n"
-              "Send them the question above. To quote now, choose a port from the nearest ones below.")
-    ports, port_notes = choose_ports(e0, args, can_ask, auto=not staff_pick)
+        print("\n  The email has no port of arrival and the sender did not ask us to suggest one.\n"
+              "  The sender will be asked. To quote now, choose a port from the list below (Enter = just ask).")
+    ports, port_notes = choose_ports(e0, args, can_ask, auto=not staff_pick, todo=todo)
     if not ports:
-        print("\nNo port chosen: no quote made. Send the questions above to the sender." if staff_pick
-              else "\nNo port we can price was chosen: no quote made.")
-        return
+        if not staff_pick:
+            todo.append("Choose a port we can price (none of the suggested ports has a tariff), or quote manually")
+        return finish()
+
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")   # shared by all ports of this run
+    quoted: list[str] = []
+    ask = list(t0.missing_fields)
     for port in ports:
         chosen = port is not None and port != e0.destination_port
         e = e0.model_copy(update={"destination_port": port}) if chosen else e0
         t = triage(e) if chosen else t0
+        name = f"{PORT_NAMES.get(port, port)} ({port})" if port else "the port"
         if t.status != "quote":
-            print(f"\n{port}: cannot quote automatically: " + "; ".join(t.reasons or t.missing_fields))
+            todo.append(f"{name}: quote manually – " + "; ".join(t.reasons or t.missing_fields))
             continue
         if chosen:
             # Not in the email: the sender must confirm the port the container is booked into.
-            confirm = (f"port of arrival: quoted via {PORT_NAMES.get(port, port)} ({port}); "
-                       "please confirm the port the container is booked into")
-            t = t.model_copy(update={"missing_fields": [confirm] + [m for m in t.missing_fields
-                                                                    if "port of arrival" not in m]})
+            t = t.model_copy(update={"missing_fields": [
+                f"port of arrival: quoted via {name}; please confirm the port the container is booked into"]
+                + [m for m in t.missing_fields if "port of arrival" not in m]})
         if needs_lookup(e):
             print()
             print(lookup_instructions(e, port_note=port_notes.get(port)))
@@ -271,12 +285,13 @@ def main(argv: list[str]) -> None:
             if check:
                 quote = price(e, haulage_check=check)
             elif args.estimate:
-                print("\n--estimate: quote made with the flat ESTIMATE haulage (marked for staff).")
                 quote = price(e)
+                todo.append(f"{name}: haulage is an ESTIMATE – replace it with the Maersk figures before sending")
             else:
-                print("\nNo quote made" + (f" for {port}" if port else "") + ": enter the Maersk haulage and fuel "
-                      "first.\nRe-run and type them when asked, or pass --haulage <amount> --fuel <amount>.\n"
-                      "(Use --estimate to make an estimate quote anyway.)")
+                print("\n  No quote made" + (f" for {name}" if port else "") + ": the Maersk haulage and fuel are needed"
+                      " first.\n  Re-run and type them when asked, or pass --haulage <amount> --fuel <amount>"
+                      " (or --estimate).")
+                todo.append(f"{name}: no quote yet – enter the Maersk haulage and fuel, then re-run")
                 continue
         else:
             quote = price(e)
@@ -285,7 +300,14 @@ def main(argv: list[str]) -> None:
         text_out = render_quote_text(e, quote, t)
         # several ports -> one file per port: quote-<date-time>-<PORT>.txt
         path = save_quote_text(text_out, stamp=f"{stamp}-{port}") if len(ports) > 1 and port else save_quote_text(text_out)
-        print(f"\nQuote saved as a text file: {path}")
+        done.append(f"Quote drafted via {name}: {quote.currency} {quote.total:,.2f} – saved as {path}")
+        quoted.append(name)
+        if chosen:
+            ask = [m for m in t0.missing_fields if "port of arrival" not in m]
+
+    if quoted and any(p != e0.destination_port for p in ports if p):
+        ask = [f"port of arrival the container is booked into (quoted via {', '.join(quoted)})"] + ask
+    finish(len(quoted), ask)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
