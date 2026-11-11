@@ -14,7 +14,7 @@ import re
 from src.config import load_config
 from src.models import ChargeSections, Direction, Enquiry, Incoterm, Mode, Service, Triage, TriageFlag
 from src.rates import RateBook, load_rate_book
-from src.scope import clearance_note, quote_scope
+from src.scope import quote_scope
 from src.haulage import carrier_haulage, fuel_age_days, fuel_is_stale
 from src.tariff import port_country, pricing_tariff, tariff_for
 from src.zones import MANUAL, zone_for_address
@@ -124,28 +124,14 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
     if e.commodity and _matches(tcfg["port_health_patterns"], e.commodity):
         flags.append(TriageFlag.PORT_HEALTH)
         info.append(f"Food/plant product ({e.commodity}): port health checks possible, at cost.")
-    if scope.destination_handling and not e.clearance_only and e.destination_port is None:
-        info.append("Port of arrival: the sender asked us to suggest one; nearest ports by road are listed below."
-                    if e.port_advice_requested else
-                    "Port of arrival not in the email (and not asked to suggest one): ask the sender. "
-                    "To quote now, choose one of the nearest ports listed below.")
-    note = clearance_note(e)
-    if note:
-        info.append(note)
-    if e.incoterm is Incoterm.DDP:
-        info.append("DDP: the seller pays import duty and VAT. Duty/VAT are not in this quote; agree how they are paid."
-                    + (" We need a signed indemnity from shipper, consignee and sender's company (in the quote terms)."
-                       if tariff else ""))
-    if tariff:
-        info.append(f"Priced from: {tariff['name']} ({tariff['currency']}, same charges at every port).")
-        h = carrier_haulage(e.destination_country) if scope.delivery else None
-        if h:
-            info.append(f"Road haulage = {h['carrier']} haulage + {h['carrier']} fuel from the {h['carrier']} inland "
-                        "price look-up (box below), then our fuel surcharge on top.")
-            if fuel_is_stale(h):
-                info.append(f"{h['carrier']} fuel % ({h['fuel_pct']:g}%) was last updated {fuel_age_days(h)} days ago: "
-                            "check the current rate and update data/haulage/maersk.yaml.")
-    elif e.destination_country not in (None, "GB"):
+    # (Incoterm meaning, DAP/DPU clearance email, port question: shown in NOTES FOR STAFF by src/report.py.)
+    if e.incoterm is Incoterm.DDP and tariff:
+        info.append("DDP: we need a signed indemnity from shipper, consignee and the sender's company (in the quote terms).")
+    h = carrier_haulage(e.destination_country) if (tariff and scope.delivery) else None
+    if h and fuel_is_stale(h):
+        info.append(f"{h['carrier']} fuel % ({h['fuel_pct']:g}%) was last updated {fuel_age_days(h)} days ago: "
+                    "check the current rate and update data/haulage/maersk.yaml.")
+    if not tariff and e.destination_country not in (None, "GB"):
         info.append(f"EU import ({e.destination_country}): customs via an EU customs partner; "
                     "duties and import VAT at cost. Confirm process with Lincoln Cargo.")
     return reasons, flags, info

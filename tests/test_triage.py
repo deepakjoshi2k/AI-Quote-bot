@@ -85,19 +85,31 @@ def test_every_incoterm_is_quotable(term):
 
 
 @pytest.mark.parametrize("term", ["DAP", "DPU"])
-def test_dap_dpu_clearance_note(term):
-    t = triage(_fcl(incoterm=Incoterm(term)))
-    assert any("Email the importer" in r for r in t.notes)
+def test_dap_dpu_clearance_email_action(term):
+    from src.report import format_staff_notes
+    e = _fcl(incoterm=Incoterm(term))
+    t = triage(e)
+    assert t.status == "quote"
+    assert "[ ] Clearance email: ask the importer" in format_staff_notes(e, t)
 
 
-def test_dap_note_not_added_when_clearance_requested():
-    t = triage(_fcl(incoterm=Incoterm.DAP, customs_clearance_requested=True))
-    assert not any("Email the importer" in r for r in t.notes)
+def test_no_clearance_email_when_clearance_requested():
+    from src.report import format_staff_notes
+    e = _fcl(incoterm=Incoterm.DAP, customs_clearance_requested=True)
+    assert "Clearance email" not in format_staff_notes(e, triage(e))
 
 
 def test_ddp_quoted_with_duty_note():
-    t = triage(_fcl(incoterm=Incoterm.DDP))
-    assert t.status == "quote" and any("DDP" in r for r in t.notes)
+    from src.report import format_staff_notes
+    e = _fcl(incoterm=Incoterm.DDP)
+    t = triage(e)
+    assert t.status == "quote" and "Duty/VAT are not in our quote" in format_staff_notes(e, t)
+
+
+def test_ddp_tariff_country_needs_indemnity():
+    t = triage(_fcl(incoterm=Incoterm.DDP, destination_country="DE", destination_port="DEHAM",
+                    delivery_postcode="20095"))
+    assert any("indemnity" in n for n in t.notes)
 
 
 def test_missing_incoterm_does_not_block():
@@ -197,7 +209,7 @@ def test_overweight_20gp_is_a_note_not_a_blocker():
 ])
 def test_dap_and_eu_imports_are_notes_never_review(overrides):
     t = triage(_fcl(**overrides))
-    assert t.status == "quote" and t.reasons == [] and t.notes
+    assert t.status == "quote" and t.reasons == []
 
 
 def test_port_health_note(fake_llm):
@@ -266,7 +278,9 @@ def test_no_port_and_not_asked_to_suggest_one_asks_the_sender():
     t = triage(_fcl(destination_country="DE", destination_port=None, delivery_postcode="20095"))
     assert t.status == "need_info"
     assert t.missing_fields[0] == PORT_QUESTION
-    assert any("not in the email" in n and "nearest ports" in n for n in t.notes)
+    from src.report import format_staff_notes
+    assert "[ ] Email the sender to ask: Port of arrival" in format_staff_notes(_fcl(destination_country="DE",
+                                                                              destination_port=None), t)
 
 
 def test_no_port_but_asked_to_suggest_one_is_quoted():
@@ -274,7 +288,8 @@ def test_no_port_but_asked_to_suggest_one_is_quoted():
                     port_advice_requested=True))
     assert t.status == "quote"
     assert any("port of arrival" in m for m in t.missing_fields)        # confirm, but doesn't block
-    assert any("asked us to suggest" in n for n in t.notes)
+    from src.report import sender_asked
+    assert "advise the nearest port" in sender_asked(_fcl(port_advice_requested=True))
 
 
 def test_no_port_mock_country_asks_even_if_advice_requested():
@@ -302,7 +317,9 @@ def test_i12_france_dap(fake_llm):
     assert t.status == "quote"                                         # tariff: same price at every French port
     assert e.port_advice_requested is True                            # "advise the nearest POD"
     assert t.missing_fields == ["port of arrival the container is booked into (we have suggested the nearest)"]
-    assert any("Email the importer" in r for r in t.notes)
+    from src.report import format_staff_notes
+    notes = format_staff_notes(e, t)
+    assert "Clearance email" in notes and "DAP –" in notes and "advise the nearest port" in notes
     assert TriageFlag.HEAVY_CONTAINER not in t.flags and t.reasons == []
 
 
@@ -321,4 +338,4 @@ def test_report_relevance(fake_llm):
     e = extract_enquiry(sample_text("I12"), llm=fake_llm)
     out = format_result(e, triage(e))
     assert "Not relevant" in out and "No (not stated)" in out and "FRLEH" not in out
-    assert "QUOTE WILL INCLUDE" in out
+    assert "DECISION: QUOTE" in out and "QUOTE COVERS" in out

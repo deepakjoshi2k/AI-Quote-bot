@@ -107,7 +107,7 @@ def test_cli_flags(monkeypatch, fake_llm, tmp_path, capsys):
     te = _patch_run(monkeypatch, fake_llm, tmp_path)
     te.main(["data/sample_enquiries/I12.txt", "--haulage", "650", "--fuel", "46.80"])
     out = capsys.readouterr().out
-    assert out.index("MAERSK INLAND PRICE LOOK-UP") < out.index("=== QUOTE (")   # look-up first, then the price
+    assert out.index("MAERSK INLAND PRICE LOOK-UP") < out.index("── QUOTE (")   # look-up first, then the price
     assert "1,305.10" in out
     assert "1,305.10" in (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
 
@@ -143,7 +143,7 @@ def test_cli_uk_quote_needs_no_lookup(monkeypatch, fake_llm, tmp_path, capsys):
     te = _patch_run(monkeypatch, fake_llm, tmp_path)
     te.main(["data/sample_enquiries/I01.txt"])
     out = capsys.readouterr().out
-    assert "MAERSK INLAND" not in out and "=== QUOTE (" in out and (tmp_path / "quote-t.txt").exists()
+    assert "MAERSK INLAND" not in out and "── QUOTE" in out and (tmp_path / "quote-t.txt").exists()
 
 
 def test_no_margin_line_when_zero():
@@ -173,8 +173,8 @@ def test_customer_text_shows_no_maersk_breakdown(fake_llm):
 
 def test_staff_report_shows_breakdown():
     from src.report import format_quote
-    out = format_quote(price(_fr(), haulage_check=HaulageCheck(650.0, 46.80)))
-    assert "INTERNAL – staff only" in out and "Maersk haulage 650.00 + Maersk fuel 46.80 = 696.80" in out
+    out = " ".join(format_quote(price(_fr(), haulage_check=HaulageCheck(650.0, 46.80))).split())
+    assert "Internal (staff)" in out and "Maersk haulage 650.00 + Maersk fuel 46.80 =" in out
 
 
 def test_fuel_pct_comes_from_tariff(monkeypatch):

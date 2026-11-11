@@ -104,7 +104,8 @@ def lookup_instructions(e, today: date | None = None, port_note: str | None = No
         ("11. Transport mode", "Truck / direct trucking (unless the customer wants rail or barge)"),
     ]
     w = max(len(k) for k, _ in rows)
-    out = ["=== MAERSK INLAND PRICE LOOK-UP (staff) ==="]
+    from src.report import section
+    out = [section("MAERSK INLAND PRICE LOOK-UP (staff)")]
     out += [f"  {k:<{w}}  {v}" for k, v in rows]
     out += ["",
             "  From the result page, note PER CONTAINER (EUR):",
