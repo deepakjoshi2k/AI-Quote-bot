@@ -221,5 +221,26 @@
       "port of arrival"
     ],
     "total": 1495.9
+  },
+  "I13": {
+    "status": "need_info",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "containers": [
+      {
+        "container_type": "40HC",
+        "quantity": 1
+      }
+    ],
+    "destination_country": "DE",
+    "incoterm": "FOB",
+    "total_gross_weight_kg": 18500,
+    "delivery_postcode": "80339",
+    "flags": [],
+    "destination_port": null,
+    "missing_contains": [
+      "port of arrival"
+    ]
   }
 }

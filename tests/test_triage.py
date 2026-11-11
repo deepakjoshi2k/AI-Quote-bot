@@ -4,7 +4,7 @@ import pytest
 from src.extract import extract_enquiry, normalise
 from src.models import ContainerLine, Enquiry, Incoterm, RawEnquiry, Service, TriageFlag
 from src.scope import describe_scope, quote_scope
-from src.triage import triage
+from src.triage import PORT_QUESTION, triage
 from src.zones import zone_for_address
 from tests.conftest import SAMPLE_IDS, sample_text
 
@@ -256,12 +256,31 @@ def test_eu_port_not_priced():
     assert TriageFlag.DESTINATION_PORT_NOT_IN_SHEET in triage(_eu(destination_port="BEZEE")).flags
 
 
-def test_tariff_country_any_port_and_no_port_needed():
-    for port in ["DEHAM", "DEBRV", None]:
+def test_tariff_country_any_port_quoted():
+    for port in ["DEHAM", "DEBRV"]:
         t = triage(_fcl(destination_country="DE", destination_port=port, delivery_postcode="20095"))
         assert t.status == "quote", (port, t.reasons, t.missing_fields)
+
+
+def test_no_port_and_not_asked_to_suggest_one_asks_the_sender():
     t = triage(_fcl(destination_country="DE", destination_port=None, delivery_postcode="20095"))
-    assert any("port of arrival" in m for m in t.missing_fields)        # asked, but doesn't block
+    assert t.status == "need_info"
+    assert t.missing_fields[0] == PORT_QUESTION
+    assert any("not in the email" in n and "nearest ports" in n for n in t.notes)
+
+
+def test_no_port_but_asked_to_suggest_one_is_quoted():
+    t = triage(_fcl(destination_country="DE", destination_port=None, delivery_postcode="20095",
+                    port_advice_requested=True))
+    assert t.status == "quote"
+    assert any("port of arrival" in m for m in t.missing_fields)        # confirm, but doesn't block
+    assert any("asked us to suggest" in n for n in t.notes)
+
+
+def test_no_port_mock_country_asks_even_if_advice_requested():
+    t = triage(_fcl(destination_country="GB", destination_port=None, delivery_postcode="SL3 0AX",
+                    port_advice_requested=True))
+    assert t.status == "need_info" and PORT_QUESTION in t.missing_fields
 
 
 def test_tariff_country_port_in_other_country_is_manual():
@@ -281,7 +300,8 @@ def test_i12_france_dap(fake_llm):
     t = triage(e)
     assert e.destination_port is None and e.origin_country is None   # nothing assumed
     assert t.status == "quote"                                         # tariff: same price at every French port
-    assert t.missing_fields == ["port of arrival (discharge port)"]    # still asked, as a side question
+    assert e.port_advice_requested is True                            # "advise the nearest POD"
+    assert t.missing_fields == ["port of arrival the container is booked into (we have suggested the nearest)"]
     assert any("Email the importer" in r for r in t.notes)
     assert TriageFlag.HEAVY_CONTAINER not in t.flags and t.reasons == []
 

@@ -264,3 +264,63 @@ def test_cli_adds_nearest_priced_port_when_top3_cannot_be_priced(monkeypatch, fa
     assert "4. Rotterdam" not in out                             # only the nearest PRICED extra is added
     assert "4. Dunkirk (FRDKK, FR)  140 km" in out
     assert "Auto-filled the nearest port we can price: FRDKK" in out
+
+
+# ---------- port missing and NOT asked to suggest one (I13): ask the sender, staff may pick ----------
+
+MUNICH = Located(lon=11.53, lat=48.14, label="80339 München, Germany")
+
+
+def _cli13(monkeypatch, fake_llm, tmp_path):
+    te = _cli(monkeypatch, fake_llm, tmp_path)
+    monkeypatch.setattr(d, "default_service", lambda: FakeRoutes(here=MUNICH))
+    return te
+
+
+def test_i13_no_port_no_request_asks_sender_and_makes_no_quote(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _cli13(monkeypatch, fake_llm, tmp_path)
+    te.main(["data/sample_enquiries/I13.txt", "--haulage", "650", "--fuel", "46.80"])
+    out = capsys.readouterr().out
+    assert "DECISION: NEED_INFO" in out and "Port of arrival the container is booked into" in out
+    assert "STAFF: the email has no port of arrival" in out
+    assert "NEAREST PORTS BY ROAD" in out
+    assert "Auto-filled" not in out                               # never filled in without being asked
+    assert "No port chosen: no quote made" in out
+    assert not list(tmp_path.glob("quote-*.txt"))
+
+
+def test_i13_staff_picks_port_and_quotes(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _cli13(monkeypatch, fake_llm, tmp_path)
+    te.main(["data/sample_enquiries/I13.txt", "--ports", "Hamburg", "--haulage", "650", "--fuel", "46.80"])
+    out = capsys.readouterr().out
+    assert "Hamburg (DEHAM) – NOT IN EMAIL" in out
+    saved = (tmp_path / "quote-t.txt").read_text(encoding="utf-8")
+    assert "quoted via Hamburg (DEHAM); please confirm the port the container is booked into" in saved
+    assert saved.count("ort of arrival") == 1                      # the open question is replaced, not repeated
+
+
+def test_i13_interactive_enter_means_just_ask(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _cli13(monkeypatch, fake_llm, tmp_path)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt="": "")
+    te.main(["data/sample_enquiries/I13.txt"])
+    assert "No port chosen: no quote made" in capsys.readouterr().out
+    assert not list(tmp_path.glob("quote-*.txt"))
+
+
+def test_i13_port_without_tariff_not_quoted(monkeypatch, fake_llm, tmp_path, capsys):
+    te = _cli13(monkeypatch, fake_llm, tmp_path)
+    te.main(["data/sample_enquiries/I13.txt", "--ports", "SIKOP", "--haulage", "650", "--fuel", "46.80"])
+    out = capsys.readouterr().out
+    assert "SIKOP: no tariff for SI" in out
+    assert not list(tmp_path.glob("quote-*.txt"))
+
+
+def test_staff_pick_only_when_port_is_the_only_gap(fake_llm):
+    from src.extract import extract_enquiry
+    from src.try_email import staff_can_choose_port
+    from tests.conftest import sample_text
+    e = extract_enquiry(sample_text("I13"), llm=fake_llm)
+    assert staff_can_choose_port(e, triage(e))
+    e2 = e.model_copy(update={"containers": []})
+    assert not staff_can_choose_port(e2, triage(e2))             # containers missing too: just ask

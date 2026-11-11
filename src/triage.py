@@ -20,6 +20,9 @@ from src.tariff import port_country, pricing_tariff, tariff_for
 from src.zones import MANUAL, zone_for_address
 
 
+PORT_QUESTION = "port of arrival the container is booked into (discharge port)"
+
+
 def _matches(patterns: list[str], text: str) -> list[str]:
     return [p for p in patterns if re.search(p, text, flags=re.IGNORECASE)]
 
@@ -121,6 +124,11 @@ def _manual_checks(e: Enquiry, scope: ChargeSections, rb: RateBook, cfg: dict
     if e.commodity and _matches(tcfg["port_health_patterns"], e.commodity):
         flags.append(TriageFlag.PORT_HEALTH)
         info.append(f"Food/plant product ({e.commodity}): port health checks possible, at cost.")
+    if scope.destination_handling and not e.clearance_only and e.destination_port is None:
+        info.append("Port of arrival: the sender asked us to suggest one; nearest ports by road are listed below."
+                    if e.port_advice_requested else
+                    "Port of arrival not in the email (and not asked to suggest one): ask the sender. "
+                    "To quote now, choose one of the nearest ports listed below.")
     note = clearance_note(e)
     if note:
         info.append(note)
@@ -160,8 +168,11 @@ def _missing_fields(e: Enquiry, scope: ChargeSections) -> tuple[list[str], list[
         if not e.containers:
             req.append("container size and number (20GP / 40GP / 40HC)")
         if scope.destination_handling and e.destination_port is None:
-            # Tariff countries charge the same at every port: the port doesn't change the price.
-            (opt if tariff else req).append("port of arrival (discharge port)")
+            if e.port_advice_requested and tariff:
+                # They asked us to suggest one: staff pick from the nearest ports; the sender confirms.
+                opt.append("port of arrival the container is booked into (we have suggested the nearest)")
+            else:
+                req.append(PORT_QUESTION)
         if scope.delivery and not e.delivery_postcode:
             req.append("delivery address and postcode")
         h = carrier_haulage(e.destination_country) if (tariff and scope.delivery) else None
@@ -185,6 +196,7 @@ def triage(enquiry: Enquiry, rate_book: RateBook | None = None) -> Triage:
 
     required, optional = _missing_fields(e, scope)
     if required:
-        return Triage(status="need_info", notes=notes, missing_fields=required + optional, flags=flags)
+        return Triage(status="need_info", notes=notes, missing_fields=required + optional,
+                      required_fields=required, flags=flags)
     # Optional questions ride along with the quote (e.g. "which Incoterm?"); they never block it.
     return Triage(status="quote", notes=notes, missing_fields=optional, flags=flags)

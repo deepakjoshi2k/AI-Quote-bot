@@ -255,6 +255,31 @@
     "notes": [
       "Sender asks us to advise the nearest port of discharge",
       "Net weight 18 t and gross weight 21 t both given"
-    ]
+    ],
+    "port_advice_requested": true
+  },
+  "I13": {
+    "customer_role": "unknown",
+    "direction": "import",
+    "mode": "sea",
+    "service": "fcl",
+    "origin_country": "CN",
+    "origin_port_name": "Shanghai",
+    "destination_country": "DE",
+    "containers": [
+      {
+        "container_type": "40' HC",
+        "quantity": 1
+      }
+    ],
+    "total_weight": 18500,
+    "weight_unit": "kg",
+    "commodity": "household appliances",
+    "incoterm": "FOB",
+    "incoterm_place": "Shanghai",
+    "delivery_required": true,
+    "delivery_postcode": "80339",
+    "delivery_place": "München, Germany",
+    "notes": []
   }
 }

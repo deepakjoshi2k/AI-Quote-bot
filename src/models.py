@@ -97,6 +97,7 @@ class Enquiry(BaseModel):
     delivery_required: bool | None = None
     customs_clearance_requested: bool | None = None  # sender asks us to clear import customs
     clearance_only: bool | None = None               # sender wants ONLY customs clearance
+    port_advice_requested: bool | None = None        # sender asks US to suggest the arrival port ("advise nearest POD")
     delivery_postcode: str | None = None   # normalised if UK, as written otherwise
     delivery_place: str | None = None      # town / address as written
     ready_date: date | None = None
@@ -125,7 +126,8 @@ class Triage(BaseModel):
     status: TriageStatus
     reasons: list[str] = Field(default_factory=list)        # why it's manual_review (blocking only)
     notes: list[str] = Field(default_factory=list)          # notes for staff: never block
-    missing_fields: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)  # questions for the sender (required first)
+    required_fields: list[str] = Field(default_factory=list)  # the ones that block the quote (need_info)
     flags: list[TriageFlag] = Field(default_factory=list)
 
 
@@ -220,6 +222,7 @@ class RawEnquiry(BaseModel):
     delivery_required: bool | None = None
     customs_clearance_requested: bool | None = None
     clearance_only: bool | None = None
+    port_advice_requested: bool | None = None
     delivery_postcode: str | None = None
     delivery_place: str | None = None
     ready_date: date | None = None
